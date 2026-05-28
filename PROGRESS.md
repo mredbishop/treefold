@@ -19,6 +19,8 @@ None
 - [x] S11 Cross-platform terminal lifecycle
 - [x] S12 Error handling and permissions
 - [x] S13 Polish, docs, and release checks
+- [x] S14 macOS application icon generation
+- [x] S15 Apple Silicon binary packaging
 
 ## Notes
 
@@ -28,3 +30,5 @@ None
 - Treemap blocks are clipped to panel bounds, tiny panel fallback message added, and fit/overlap/utilization tests added.
 - Treemap labels now show container size where width allows, with tested truncation and small-block fallback.
 - Treemap now aggregates tiny entries into a single synthetic block with combined size and deterministic label.
+- Added deterministic macOS icon generation script and committed source SVG + generated ICNS.
+- Added Apple Silicon packaging script that builds arm64 binary and creates a `.app` bundle.

@@ -33,3 +33,41 @@ If no path is supplied, `treefold` scans the current working directory.
 
 - Treemap uses a simple slice-and-dice layout, not a squarified treemap.
 - Very small terminal sizes may hide labels.
+
+## macOS Icon
+
+The app icon is derived from the `treefold` name and stored as source artwork:
+
+- `assets/treefold-icon.svg`
+
+Generate macOS icon assets:
+
+```bash
+chmod +x scripts/generate_macos_icon.sh
+scripts/generate_macos_icon.sh
+```
+
+This creates:
+
+- `assets/treefold.iconset/`
+- `assets/treefold.icns`
+
+## Apple Silicon Packaging
+
+Build a native Apple Silicon binary and `.app` bundle:
+
+```bash
+chmod +x scripts/build_apple_silicon_app.sh
+scripts/build_apple_silicon_app.sh
+```
+
+Artifacts:
+
+- Binary: `target/aarch64-apple-darwin/release/treefold`
+- App bundle: `dist/treefold.app`
+
+Check architecture:
+
+```bash
+file target/aarch64-apple-darwin/release/treefold
+```

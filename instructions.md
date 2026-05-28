@@ -98,6 +98,8 @@ None
 - [ ] S11 Cross-platform terminal lifecycle
 - [ ] S12 Error handling and permissions
 - [ ] S13 Polish, docs, and release checks
+- [ ] S14 macOS application icon generation
+- [ ] S15 Apple Silicon binary packaging
 
 ## Notes
 
@@ -585,6 +587,71 @@ cargo test
 cargo run -- --help
 cargo run -- .
 ```
+
+---
+
+## S14 macOS application icon generation
+
+### User Story
+
+As a macOS user, I want a distinctive application icon derived from the `treefold` name so the app looks native and recognizable in Finder and the Dock.
+
+### Acceptance Criteria
+
+* Repository includes source icon artwork and exported macOS icon assets.
+* Icon concept is clearly based on the product name `treefold`.
+* A valid `.icns` file is produced for macOS app usage.
+* Asset set includes required icon sizes for macOS app icons (via `iconset` or equivalent).
+* Build/documentation explains how the icon is generated or regenerated.
+
+### Tests
+
+* Verify icon artifact exists (for example: `assets/treefold.icns`).
+* Validate iconset generation command completes successfully on macOS.
+* Manual visual check confirms icon is legible at small sizes (16x16, 32x32) and crisp at larger sizes.
+
+### Implementation Notes
+
+* Prefer a deterministic icon-generation script checked into the repo.
+* Keep source artwork editable (for example, SVG or high-resolution PNG) and generate derivatives from it.
+
+---
+
+## S15 Apple Silicon binary packaging
+
+### User Story
+
+As an Apple Silicon Mac user, I want a runnable native executable (and optionally `.app` bundle) so I can run `treefold` without a Rust toolchain.
+
+### Acceptance Criteria
+
+* Produce a native `aarch64-apple-darwin` release build.
+* Provide packaging steps for a standalone binary and optional `.app` bundle.
+* If `.app` bundle is created, it includes:
+
+  * executable in `Contents/MacOS/`
+  * `Info.plist`
+  * app icon in `Contents/Resources/`
+* Documentation includes install/run instructions for Apple Silicon users.
+* Output artifact path(s) are documented.
+
+### Tests
+
+* Build test:
+
+  * `cargo build --release --target aarch64-apple-darwin`
+* Binary architecture check:
+
+  * `file <path-to-binary>` reports `arm64` / `aarch64`.
+* Manual run test on Apple Silicon:
+
+  * launch binary (or `.app`)
+  * verify TUI starts and exits cleanly with `q`.
+
+### Implementation Notes
+
+* Keep packaging scripts reproducible (for example in `scripts/`).
+* Optional future extension: universal binary (`x86_64` + `arm64`) after Apple Silicon-native flow is stable.
 
 ---
 

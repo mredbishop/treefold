@@ -430,3 +430,10 @@ fn treemap_many_tiny_files_no_panic() {
     }
     let _ = build_treemap(area, &entries);
 }
+
+#[test]
+fn macos_assets_and_scripts_exist() {
+    assert!(std::path::Path::new("assets/treefold-icon.svg").exists());
+    assert!(std::path::Path::new("scripts/generate_macos_icon.sh").exists());
+    assert!(std::path::Path::new("scripts/build_apple_silicon_app.sh").exists());
+}
