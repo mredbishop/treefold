@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use iced::event;
 use iced::keyboard::{Event as KeyEvent, Key, key::Named};
@@ -49,6 +49,8 @@ pub struct GuiApp {
     scanning_current_subfolder: Option<String>,
     progress_shared: Option<Arc<Mutex<Option<String>>>>,
     scan_request_id: u64,
+    scan_started_at: Option<Instant>,
+    scan_tick: u64,
 }
 
 impl Default for GuiApp {
@@ -73,6 +75,8 @@ impl GuiApp {
             scanning_current_subfolder: None,
             progress_shared: None,
             scan_request_id: 0,
+            scan_started_at: None,
+            scan_tick: 0,
         }
     }
 
@@ -95,6 +99,8 @@ impl GuiApp {
         self.scanning_path = None;
         self.scanning_current_subfolder = None;
         self.progress_shared = None;
+        self.scan_started_at = None;
+        self.scan_tick = 0;
     }
 }
 
@@ -150,6 +156,7 @@ pub fn update(app: &mut GuiApp, message: Message) -> Task<Message> {
             }
         }
         Message::ScanProgressTick => {
+            app.scan_tick = app.scan_tick.wrapping_add(1);
             if app.is_scanning
                 && let Some(shared) = &app.progress_shared
                 && let Ok(lock) = shared.lock()
@@ -289,19 +296,52 @@ pub fn view(app: &GuiApp) -> Element<'_, Message> {
     .spacing(8);
 
     let loading = if app.is_scanning {
+        let spinner = match app.scan_tick % 4 {
+            0 => "⠋",
+            1 => "⠙",
+            2 => "⠹",
+            _ => "⠸",
+        };
+        let elapsed = app
+            .scan_started_at
+            .map(|t| t.elapsed().as_secs())
+            .unwrap_or(0);
         text(format!(
-            "Scanning in progress: {}{}",
+            "{spinner} Scanning: {}{} | {}s elapsed",
             app.scanning_path.as_deref().unwrap_or("<unknown>"),
             app.scanning_current_subfolder
                 .as_ref()
                 .map(|p| format!(" | current: {p}"))
-                .unwrap_or_default()
+                .unwrap_or_else(|| " | current: preparing...".to_string()),
+            elapsed
         ))
     } else {
         text("")
     };
 
-    let body: Element<'_, Message> = if let Some(state) = &app.state {
+    let body: Element<'_, Message> = if app.is_scanning && app.state.is_none() {
+        let active = app
+            .scanning_current_subfolder
+            .as_deref()
+            .unwrap_or("Preparing scan...");
+        container(
+            column![
+                text("Scanning in progress").size(24),
+                text(format!(
+                    "Root: {}",
+                    app.scanning_path.as_deref().unwrap_or("<unknown>")
+                )),
+                text(format!("Current: {active}")),
+                text("Waiting for directory access prompts is normal on macOS.")
+            ]
+            .spacing(8),
+        )
+        .width(Length::Fill)
+        .height(Length::Fill)
+        .center_x(Length::Fill)
+        .center_y(Length::Fill)
+        .into()
+    } else if let Some(state) = &app.state {
         let children = state.current_children();
         let mut list_col =
             column![text(format!("Current: {}", state.current_dir.display()))].spacing(6);
@@ -438,22 +478,8 @@ pub fn run_with_path(path: Option<PathBuf>) -> iced::Result {
     iced::application(
         move || {
             let mut app = GuiApp::with_root_input(initial_root.clone());
-            app.is_scanning = true;
-            app.scanning_path = Some(initial_root.clone());
-            app.scan_request_id = 1;
-            let run_path = initial_root.clone();
-            let done_path = initial_root.clone();
-            (
-                app,
-                Task::perform(
-                    async move { init_state_from_path(&run_path) },
-                    move |result| Message::ScanCompleted {
-                        request_id: 1,
-                        result,
-                        root_input: done_path.clone(),
-                    },
-                ),
-            )
+            let task = start_scan(&mut app, initial_root.clone());
+            (app, task)
         },
         update,
         view,
@@ -552,6 +578,8 @@ fn start_scan(app: &mut GuiApp, path: String) -> Task<Message> {
     app.is_scanning = true;
     app.scanning_path = Some(path.clone());
     app.scanning_current_subfolder = None;
+    app.scan_started_at = Some(Instant::now());
+    app.scan_tick = 0;
     let shared_progress: Arc<Mutex<Option<String>>> = Arc::new(Mutex::new(None));
     app.progress_shared = Some(shared_progress.clone());
     let run_path = path.clone();
