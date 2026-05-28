@@ -9,7 +9,9 @@ use treefold::fs_scan::{EntryKind, FsEntry, count_errors, scan_path};
 use treefold::input::{Action, map_key};
 use treefold::layout::{ensure_visible_offset, human_size, split_main};
 use treefold::state::AppState;
-use treefold::treemap::{build_treemap, rect_within_bounds, rects_overlap};
+use treefold::treemap::{
+    aggregate_small_entries, build_treemap, rect_within_bounds, rects_overlap,
+};
 use treefold::ui::{format_treemap_label, render, status_line, treemap_fallback_message};
 
 fn key(code: KeyCode, modifiers: KeyModifiers) -> KeyEvent {
@@ -346,4 +348,85 @@ fn treemap_label_formatting_handles_size_and_truncation() {
     let small = format_treemap_label("dependencies", 1024 * 1024, 6);
     assert!(!small.contains("MiB"));
     assert!(small.chars().count() <= 6);
+}
+
+#[test]
+fn small_entries_are_aggregated_with_correct_size() {
+    let area = Rect::new(0, 0, 20, 10);
+    let entries = vec![
+        FsEntry {
+            path: "big".into(),
+            name: "big".into(),
+            kind: EntryKind::File,
+            size: 1_000,
+            children: vec![],
+            errors: vec![],
+        },
+        FsEntry {
+            path: "s1".into(),
+            name: "s1".into(),
+            kind: EntryKind::File,
+            size: 1,
+            children: vec![],
+            errors: vec![],
+        },
+        FsEntry {
+            path: "s2".into(),
+            name: "s2".into(),
+            kind: EntryKind::File,
+            size: 1,
+            children: vec![],
+            errors: vec![],
+        },
+    ];
+
+    let prepared = aggregate_small_entries(area, &entries);
+    assert!(prepared.iter().any(|e| e.name == "big"));
+    let aggregate = prepared
+        .iter()
+        .find(|e| e.name.starts_with("Small entries"))
+        .expect("aggregate present");
+    assert_eq!(aggregate.size, 2);
+}
+
+#[test]
+fn treemap_shows_aggregate_block_when_threshold_triggers() {
+    let area = Rect::new(0, 0, 40, 12);
+    let mut entries = vec![FsEntry {
+        path: "big".into(),
+        name: "big".into(),
+        kind: EntryKind::File,
+        size: 5_000,
+        children: vec![],
+        errors: vec![],
+    }];
+    for i in 0..30 {
+        entries.push(FsEntry {
+            path: format!("s{i}").into(),
+            name: format!("s{i}"),
+            kind: EntryKind::File,
+            size: 1,
+            children: vec![],
+            errors: vec![],
+        });
+    }
+    let blocks = build_treemap(area, &entries);
+    assert!(blocks.iter().any(|b| b.name.starts_with("Small entries")));
+}
+
+#[test]
+fn treemap_many_tiny_files_no_panic() {
+    let area = Rect::new(0, 0, 50, 20);
+    let mut entries = Vec::new();
+    for i in 0..500 {
+        entries.push(FsEntry {
+            path: format!("tiny-{i}").into(),
+            name: format!("tiny-{i}"),
+            kind: EntryKind::File,
+            size: 1,
+            children: vec![],
+            errors: vec![],
+        });
+    }
+    let _ = build_treemap(area, &entries);
 }

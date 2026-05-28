@@ -15,9 +15,10 @@ None
 - [x] S7 Treemap rendering
 - [x] S8 Treemap fit-to-panel behaviour
 - [x] S9 Treemap container size labels
-- [x] S10 Cross-platform terminal lifecycle
-- [x] S11 Error handling and permissions
-- [x] S12 Polish, docs, and release checks
+- [x] S10 Treemap small-entry aggregation block
+- [x] S11 Cross-platform terminal lifecycle
+- [x] S12 Error handling and permissions
+- [x] S13 Polish, docs, and release checks
 
 ## Notes
 
@@ -26,3 +27,4 @@ None
 - Terminal lifecycle is managed via `TerminalGuard` and cleaned up on drop.
 - Treemap blocks are clipped to panel bounds, tiny panel fallback message added, and fit/overlap/utilization tests added.
 - Treemap labels now show container size where width allows, with tested truncation and small-block fallback.
+- Treemap now aggregates tiny entries into a single synthetic block with combined size and deterministic label.

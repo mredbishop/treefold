@@ -2,9 +2,18 @@ use ratatui::layout::Rect;
 
 use crate::fs_scan::FsEntry;
 
+const MIN_EXPECTED_BLOCK_AREA: f64 = 6.0;
+
+#[derive(Debug, Clone)]
+pub struct TreemapEntry {
+    pub path: Option<std::path::PathBuf>,
+    pub name: String,
+    pub size: u64,
+}
+
 #[derive(Debug, Clone)]
 pub struct TreemapBlock {
-    pub path: std::path::PathBuf,
+    pub path: Option<std::path::PathBuf>,
     pub name: String,
     pub size: u64,
     pub rect: Rect,
@@ -14,7 +23,8 @@ pub fn build_treemap(area: Rect, children: &[FsEntry]) -> Vec<TreemapBlock> {
     if area.width == 0 || area.height == 0 {
         return Vec::new();
     }
-    let mut entries: Vec<&FsEntry> = children.iter().filter(|e| e.size > 0).collect();
+    let prepared = aggregate_small_entries(area, children);
+    let mut entries: Vec<&TreemapEntry> = prepared.iter().filter(|e| e.size > 0).collect();
     if entries.is_empty() {
         return Vec::new();
     }
@@ -29,7 +39,7 @@ pub fn build_treemap(area: Rect, children: &[FsEntry]) -> Vec<TreemapBlock> {
         .collect()
 }
 
-fn split_recursive(area: Rect, entries: &[&FsEntry], depth: usize) -> Vec<TreemapBlock> {
+fn split_recursive(area: Rect, entries: &[&TreemapEntry], depth: usize) -> Vec<TreemapBlock> {
     if entries.is_empty() || area.width == 0 || area.height == 0 {
         return Vec::new();
     }
@@ -109,7 +119,7 @@ fn split_recursive(area: Rect, entries: &[&FsEntry], depth: usize) -> Vec<Treema
     out
 }
 
-fn choose_split_index(entries: &[&FsEntry]) -> usize {
+fn choose_split_index(entries: &[&TreemapEntry]) -> usize {
     if entries.len() <= 1 {
         return 1;
     }
@@ -123,6 +133,47 @@ fn choose_split_index(entries: &[&FsEntry]) -> usize {
         }
     }
     entries.len() - 1
+}
+
+pub fn aggregate_small_entries(area: Rect, children: &[FsEntry]) -> Vec<TreemapEntry> {
+    let mut entries: Vec<&FsEntry> = children.iter().filter(|e| e.size > 0).collect();
+    entries.sort_by(|a, b| b.size.cmp(&a.size).then_with(|| a.name.cmp(&b.name)));
+    if entries.is_empty() {
+        return Vec::new();
+    }
+
+    let total_size: u64 = entries.iter().map(|e| e.size).sum();
+    if total_size == 0 {
+        return Vec::new();
+    }
+    let total_area = (area.width as f64) * (area.height as f64);
+
+    let mut regular = Vec::new();
+    let mut small_count = 0usize;
+    let mut small_size = 0u64;
+    for entry in entries {
+        let expected_area = (entry.size as f64 / total_size as f64) * total_area;
+        if expected_area < MIN_EXPECTED_BLOCK_AREA {
+            small_count += 1;
+            small_size = small_size.saturating_add(entry.size);
+        } else {
+            regular.push(TreemapEntry {
+                path: Some(entry.path.clone()),
+                name: entry.name.clone(),
+                size: entry.size,
+            });
+        }
+    }
+
+    if small_count > 0 {
+        regular.push(TreemapEntry {
+            path: None,
+            name: format!("Small entries ({small_count})"),
+            size: small_size,
+        });
+    }
+
+    regular
 }
 
 fn clip_rect(rect: Rect, bounds: Rect) -> Rect {

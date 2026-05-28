@@ -63,7 +63,10 @@ fn render_treemap(frame: &mut Frame<'_>, state: &AppState, area: Rect) {
     }
     let selected = state.selected_child().map(|e| e.path.clone());
     for b in blocks {
-        let is_selected = selected.as_ref().is_some_and(|p| p == &b.path);
+        let is_selected = match (&selected, &b.path) {
+            (Some(sel), Some(path)) => sel == path,
+            _ => false,
+        };
         let style = if is_selected {
             Style::default().fg(Color::Black).bg(Color::Cyan)
         } else {

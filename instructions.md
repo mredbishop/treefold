@@ -94,9 +94,10 @@ None
 - [ ] S7 Treemap rendering
 - [ ] S8 Treemap fit-to-panel behaviour
 - [ ] S9 Treemap container size labels
-- [ ] S10 Cross-platform terminal lifecycle
-- [ ] S11 Error handling and permissions
-- [ ] S12 Polish, docs, and release checks
+- [ ] S10 Treemap small-entry aggregation block
+- [ ] S11 Cross-platform terminal lifecycle
+- [ ] S12 Error handling and permissions
+- [ ] S13 Polish, docs, and release checks
 
 ## Notes
 
@@ -465,7 +466,41 @@ As a user, I want each treemap container to show its size so I can read exact di
 
 ---
 
-## S10 Cross-platform terminal lifecycle
+## S10 Treemap small-entry aggregation block
+
+### User Story
+
+As a user, I want entries that are too small to render as meaningful individual blocks to be grouped into one block, so the treemap stays readable while still accounting for their total size.
+
+### Acceptance Criteria
+
+* Entries below a defined visual threshold are aggregated into a single synthetic treemap block.
+* Aggregated block has a clear label (for example: `Small entries (N)` or `Other small items`) and shows total aggregated size.
+* Aggregation does not lose size accounting:
+
+  * sum of visible treemap block sizes equals sum of rendered entries (including aggregated entries)
+* If no entries are below threshold, no aggregation block is shown.
+* Aggregation behavior is deterministic for the same input and panel size.
+* Selected-item highlighting remains stable; if selected entry is inside the aggregated set, selected styling is handled gracefully (for example: no highlight or aggregate highlight by rule, but no crash).
+
+### Tests
+
+* Unit test for aggregation selector:
+
+  * small entries are grouped
+  * large entries remain individual
+  * aggregated size equals sum of grouped entries
+* Rendering/layout test verifies aggregate block appears with expected label and size text when threshold is triggered.
+* Regression test verifies no overflow/panic with many tiny files.
+
+### Implementation Notes
+
+* Keep aggregation as a preprocessing step before treemap layout.
+* Make threshold policy explicit and testable (area-based or minimum width/height based).
+
+---
+
+## S11 Cross-platform terminal lifecycle
 
 ### User Story
 
@@ -492,7 +527,7 @@ As a user, I want the app to reliably enter and leave terminal UI mode.
 
 ---
 
-## S11 Error handling and permissions
+## S12 Error handling and permissions
 
 ### User Story
 
@@ -518,7 +553,7 @@ As a user, I want scan errors to be visible but non-fatal.
 
 ---
 
-## S12 Polish, docs, and release checks
+## S13 Polish, docs, and release checks
 
 ### User Story
 
