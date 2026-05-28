@@ -21,6 +21,8 @@ None
 - [x] S13 Polish, docs, and release checks
 - [x] S14 macOS application icon generation
 - [x] S15 Apple Silicon binary packaging
+- [x] S16 Iced GUI application foundation
+- [x] S17 Cross-platform GUI packaging and release
 
 ## Notes
 
@@ -32,3 +34,5 @@ None
 - Treemap now aggregates tiny entries into a single synthetic block with combined size and deterministic label.
 - Added deterministic macOS icon generation script and committed source SVG + generated ICNS.
 - Added Apple Silicon packaging script that builds arm64 binary and creates a `.app` bundle.
+- Added `iced` GUI binary (`treefold-gui`) with path scan, entry navigation, refresh, and size-based visualization bars.
+- Added GUI packaging/check scripts for Apple Silicon app bundle and optional Linux/Windows target checks.

@@ -1,5 +1,6 @@
 pub mod app;
 pub mod fs_scan;
+pub mod gui;
 pub mod input;
 pub mod layout;
 pub mod state;

@@ -6,6 +6,7 @@ use ratatui::backend::TestBackend;
 use ratatui::layout::Rect;
 use tempfile::tempdir;
 use treefold::fs_scan::{EntryKind, FsEntry, count_errors, scan_path};
+use treefold::gui::init_state_from_path;
 use treefold::input::{Action, map_key};
 use treefold::layout::{ensure_visible_offset, human_size, split_main};
 use treefold::state::AppState;
@@ -436,4 +437,13 @@ fn macos_assets_and_scripts_exist() {
     assert!(std::path::Path::new("assets/treefold-icon.svg").exists());
     assert!(std::path::Path::new("scripts/generate_macos_icon.sh").exists());
     assert!(std::path::Path::new("scripts/build_apple_silicon_app.sh").exists());
+    assert!(std::path::Path::new("scripts/build_gui_apple_silicon_app.sh").exists());
+    assert!(std::path::Path::new("scripts/check_gui_targets.sh").exists());
+}
+
+#[test]
+fn gui_app_initializes_from_path() {
+    let root = std::env::current_dir().expect("cwd");
+    let state = init_state_from_path(root.to_string_lossy().as_ref()).expect("init");
+    assert!(state.root.path.exists());
 }

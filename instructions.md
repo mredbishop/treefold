@@ -100,6 +100,8 @@ None
 - [ ] S13 Polish, docs, and release checks
 - [ ] S14 macOS application icon generation
 - [ ] S15 Apple Silicon binary packaging
+- [ ] S16 Iced GUI application foundation
+- [ ] S17 Cross-platform GUI packaging and release
 
 ## Notes
 
@@ -652,6 +654,72 @@ As an Apple Silicon Mac user, I want a runnable native executable (and optionall
 
 * Keep packaging scripts reproducible (for example in `scripts/`).
 * Optional future extension: universal binary (`x86_64` + `arm64`) after Apple Silicon-native flow is stable.
+
+---
+
+## S16 Iced GUI application foundation
+
+### User Story
+
+As a user, I want a desktop GUI version of `treefold` built with `iced` so I can use the app outside the terminal on macOS and other platforms.
+
+### Acceptance Criteria
+
+* Add an `iced`-based desktop application target to the project.
+* GUI app can:
+
+  * choose/start from a root path (default current directory)
+  * display directory entries in a navigable list
+  * show a treemap-like usage visualization panel
+  * navigate into child directories and back to parent
+  * refresh scan
+* GUI shows size values consistently with existing formatting.
+* Scan errors remain non-fatal and are visible in the GUI.
+* Existing core scan/state logic is reused where practical (avoid duplicating business logic).
+
+### Tests
+
+* Unit tests for any extracted GUI-independent adapters/view-model logic.
+* Smoke test that GUI app state can be initialized from a path.
+* Existing scanner/state tests continue passing.
+
+### Implementation Notes
+
+* Prefer sharing modules between TUI and GUI (scanner/state/layout helpers).
+* Keep GUI-specific logic in separate files/modules (for example `src/gui/`).
+* Start with functional layout over visual polish; polish can follow after parity.
+
+---
+
+## S17 Cross-platform GUI packaging and release
+
+### User Story
+
+As a user, I want installable/runnable GUI artifacts for Apple Silicon macOS and other major platforms so I can run `treefold` as a desktop app.
+
+### Acceptance Criteria
+
+* Provide documented build targets for:
+
+  * macOS (Apple Silicon native)
+  * Linux
+  * Windows
+* macOS GUI artifact supports app launching via `.app` bundle (or equivalent launcher workflow).
+* GUI app icon is applied in packaged app where supported.
+* Packaging scripts/configs are committed and reproducible.
+* README includes GUI run/build/package instructions per platform.
+
+### Tests
+
+* macOS build test for GUI target (Apple Silicon).
+* At least one CI-friendly verification per non-macOS platform path (for example compile-only checks).
+* Manual launch verification checklist for macOS/Linux/Windows.
+
+### Implementation Notes
+
+* Keep TUI and GUI binaries separable (for example feature flags or multiple bin targets).
+* Prefer standard Rust ecosystem tools for packaging where possible.
+* Defer signing/notarization unless explicitly requested, but document where it would fit.
 
 ---
 

@@ -71,3 +71,31 @@ Check architecture:
 ```bash
 file target/aarch64-apple-darwin/release/treefold
 ```
+
+## GUI (iced)
+
+Run the GUI version:
+
+```bash
+cargo run --bin treefold-gui
+```
+
+Build GUI binary:
+
+```bash
+cargo build --release --bin treefold-gui
+```
+
+Build Apple Silicon macOS GUI app bundle:
+
+```bash
+chmod +x scripts/build_gui_apple_silicon_app.sh
+scripts/build_gui_apple_silicon_app.sh
+```
+
+Cross-platform GUI target checks (when targets are installed):
+
+```bash
+chmod +x scripts/check_gui_targets.sh
+scripts/check_gui_targets.sh
+```

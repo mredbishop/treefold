@@ -2,10 +2,12 @@
 name = "treefold"
 version = "0.1.0"
 edition = "2024"
+default-run = "treefold"
 
 [dependencies]
 anyhow = "1.0.102"
 crossterm = "0.29.0"
+iced = "0.14.0"
 ratatui = "0.30.0"
 thiserror = "2.0.18"
 unicode-width = "0.2.2"
