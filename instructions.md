@@ -107,6 +107,10 @@ None
 - [ ] S19 GUI heatmap interaction and polish
 - [ ] S20 GUI keyboard parity and visual focus
 - [ ] S21 Default binary mode selection (GUI default, TUI flag)
+- [ ] S22 GUI treemap file-vs-folder visual distinction
+- [ ] S23 GUI treemap hover details
+- [ ] S24 GUI context menu: open location actions
+- [ ] S25 GUI context menu: delete with confirmation
 
 ## Notes
 
@@ -883,6 +887,126 @@ As a user, I want the compiled `treefold` binary to launch the GUI by default, w
 
 * Keep mode parsing isolated in a small parser/helper to keep entrypoint logic clean.
 * Preserve existing TUI behavior and keybindings when `--tui` is used.
+
+---
+
+## S22 GUI treemap file-vs-folder visual distinction
+
+### User Story
+
+As a GUI user, I want folders and files to look visually different in the treemap so I can quickly identify structure versus content.
+
+### Acceptance Criteria
+
+* Treemap blocks for directories and files are visually distinct.
+* Distinction remains clear in normal, hover, and selected states.
+* Distinction works alongside existing heatmap coloring (does not remove size heat cues).
+* Distinction remains legible with many entries and small blocks.
+
+### Tests
+
+* Unit tests for style mapping by entry type (file vs directory).
+* GUI render smoke test verifies both style variants are emitted.
+* Regression test for tiny blocks confirms no panic or unreadable artifacts.
+
+### Implementation Notes
+
+* Prefer consistent visual channels (for example border style + icon/marker + subtle tint).
+* Keep style decisions in a pure helper for deterministic tests.
+
+---
+
+## S23 GUI treemap hover details
+
+### User Story
+
+As a GUI user, I want details when hovering over a treemap block so I can inspect an item without clicking.
+
+### Acceptance Criteria
+
+* Hovering a block shows a detail view (tooltip or detail panel) including:
+
+  * name
+  * type (file/folder)
+  * size
+  * path (full or safely truncated)
+* Hover details update as cursor moves between blocks.
+* Hovering empty space clears or hides hover details.
+* Hover behavior does not interfere with click selection/navigation.
+
+### Tests
+
+* Unit tests for hit-test -> hover detail data mapping.
+* GUI interaction test verifies hover enter/leave transitions.
+* Regression test for resize + hover sequence (no stale hover state / no panic).
+
+### Implementation Notes
+
+* Separate hover state computation from rendering for easier testing.
+* Reuse existing formatting helpers for size/path display consistency.
+
+---
+
+## S24 GUI context menu: open location actions
+
+### User Story
+
+As a GUI user, I want a right-click menu with context-appropriate open actions so I can jump to a location in my OS file browser.
+
+### Acceptance Criteria
+
+* Right-clicking a block opens a context menu.
+* If target is a directory: show `Open this directory`.
+* If target is a file: show `View in parent`.
+* Action opens the relevant location in the platform file browser:
+
+  * macOS Finder
+  * Windows File Explorer
+  * Linux default file manager
+* Failures are handled with a non-crashing error message.
+
+### Tests
+
+* Unit tests for menu-option selection logic by entry type.
+* Unit tests for OS command resolution/routing (mocked execution).
+* Manual verification checklist for macOS/Linux/Windows behavior.
+
+### Implementation Notes
+
+* Isolate OS-launch logic behind a small adapter for testability.
+* Avoid blocking UI thread while launching external file browser command.
+
+---
+
+## S25 GUI context menu: delete with confirmation
+
+### User Story
+
+As a GUI user, I want a right-click delete action with confirmation so I can safely remove files/folders from the treemap.
+
+### Acceptance Criteria
+
+* Context menu includes `Delete this folder` or `Delete this file` based on entry type.
+* Selecting delete always shows a confirmation dialog before executing.
+* Confirmation dialog includes clear target name/path and irreversible warning.
+* Cancel leaves filesystem unchanged.
+* Confirm executes deletion and refreshes scan/view.
+* Deletion failures are surfaced as non-fatal errors.
+
+### Tests
+
+* Unit tests for delete-label selection by entry type.
+* Unit tests for confirmation workflow state transitions (open/cancel/confirm).
+* Integration-style test with `tempfile` verifies:
+
+  * cancel preserves file/folder
+  * confirm removes file/folder
+* Regression test for deletion errors (permissions/path race) confirms no crash.
+
+### Implementation Notes
+
+* Wrap filesystem mutation in a small service layer to simplify mocking/testing.
+* Consider optional future enhancement for trash/recycle-bin behavior.
 
 ---
 

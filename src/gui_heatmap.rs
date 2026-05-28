@@ -14,6 +14,20 @@ pub struct HeatmapBlock {
     pub rect: Rectangle,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HeatmapEvent {
+    Select(usize),
+    Context(usize),
+    Hover(Option<usize>),
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct BlockStyle {
+    pub fill: Color,
+    pub border: Color,
+    pub border_width: f32,
+}
+
 pub fn color_for_ratio(ratio: f32) -> Color {
     let clamped = ratio.clamp(0.0, 1.0);
     // cool -> warm scale
@@ -21,6 +35,42 @@ pub fn color_for_ratio(ratio: f32) -> Color {
     let g = 0.65 - 0.45 * clamped;
     let b = 0.85 - 0.75 * clamped;
     Color::from_rgb(r, g.max(0.1), b.max(0.1))
+}
+
+pub fn style_for_block(is_dir: bool, ratio: f32, selected: bool, hovered: bool) -> BlockStyle {
+    let base = color_for_ratio(ratio);
+    let fill = if is_dir {
+        Color::from_rgb(
+            (base.r + 0.05).min(1.0),
+            (base.g + 0.08).min(1.0),
+            (base.b + 0.03).min(1.0),
+        )
+    } else {
+        Color::from_rgb(
+            (base.r - 0.02).max(0.0),
+            (base.g - 0.02).max(0.0),
+            (base.b - 0.02).max(0.0),
+        )
+    };
+    let border = if is_dir {
+        Color::from_rgba(0.95, 0.95, 0.95, 0.9)
+    } else {
+        Color::from_rgba(0.05, 0.05, 0.05, 0.6)
+    };
+    let border_width = if selected {
+        3.0
+    } else if hovered {
+        2.0
+    } else if is_dir {
+        1.5
+    } else {
+        1.0
+    };
+    BlockStyle {
+        fill,
+        border,
+        border_width,
+    }
 }
 
 pub fn build_heatmap_blocks(width: f32, height: f32, entries: &[FsEntry]) -> Vec<HeatmapBlock> {
@@ -75,12 +125,14 @@ pub fn hit_test(blocks: &[HeatmapBlock], point: Point) -> Option<usize> {
 pub fn heatmap_canvas<'a, Message: Clone + 'a>(
     entries: Vec<FsEntry>,
     selected_index: Option<usize>,
-    on_select: fn(usize) -> Message,
+    hovered_index: Option<usize>,
+    on_event: fn(HeatmapEvent) -> Message,
 ) -> Element<'a, Message> {
     Canvas::new(HeatmapCanvas {
         entries,
         selected_index,
-        on_select,
+        hovered_index,
+        on_event,
     })
     .width(Length::Fill)
     .height(Length::Fill)
@@ -90,25 +142,46 @@ pub fn heatmap_canvas<'a, Message: Clone + 'a>(
 struct HeatmapCanvas<Message> {
     entries: Vec<FsEntry>,
     selected_index: Option<usize>,
-    on_select: fn(usize) -> Message,
+    hovered_index: Option<usize>,
+    on_event: fn(HeatmapEvent) -> Message,
 }
 
 impl<Message: Clone> Program<Message> for HeatmapCanvas<Message> {
-    type State = ();
+    type State = Option<usize>;
 
     fn update(
         &self,
-        _state: &mut Self::State,
+        state: &mut Self::State,
         event: &canvas::Event,
         bounds: Rectangle,
         cursor: mouse::Cursor,
     ) -> Option<canvas::Action<Message>> {
-        if let canvas::Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)) = event
-            && let Some(point) = cursor.position_in(bounds)
-        {
-            let blocks = build_heatmap_blocks(bounds.width, bounds.height, &self.entries);
-            if let Some(idx) = hit_test(&blocks, point) {
-                return Some(canvas::Action::publish((self.on_select)(idx)).and_capture());
+        let blocks = build_heatmap_blocks(bounds.width, bounds.height, &self.entries);
+        if let Some(point) = cursor.position_in(bounds) {
+            if let canvas::Event::Mouse(mouse::Event::CursorMoved { .. }) = event {
+                let hovered = hit_test(&blocks, point);
+                if *state != hovered {
+                    *state = hovered;
+                    return Some(canvas::Action::publish((self.on_event)(
+                        HeatmapEvent::Hover(hovered),
+                    )));
+                }
+            }
+            if let canvas::Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)) = event
+                && let Some(idx) = hit_test(&blocks, point)
+            {
+                return Some(
+                    canvas::Action::publish((self.on_event)(HeatmapEvent::Select(idx)))
+                        .and_capture(),
+                );
+            }
+            if let canvas::Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Right)) = event
+                && let Some(idx) = hit_test(&blocks, point)
+            {
+                return Some(
+                    canvas::Action::publish((self.on_event)(HeatmapEvent::Context(idx)))
+                        .and_capture(),
+                );
             }
         }
         None
@@ -128,26 +201,32 @@ impl<Message: Clone> Program<Message> for HeatmapCanvas<Message> {
 
         for block in blocks {
             let ratio = block.size as f32 / total as f32;
-            let fill = color_for_ratio(ratio);
+            let style = style_for_block(
+                block.is_dir,
+                ratio,
+                self.selected_index.is_some_and(|i| i == block.index),
+                self.hovered_index.is_some_and(|i| i == block.index),
+            );
             let rect = Path::rectangle(
                 Point::new(block.rect.x, block.rect.y),
                 iced::Size::new(block.rect.width, block.rect.height),
             );
-            frame.fill(&rect, fill);
+            frame.fill(&rect, style.fill);
             frame.stroke(
                 &rect,
-                Stroke::default().with_color(Color::from_rgba(0.0, 0.0, 0.0, 0.45)),
+                Stroke::default()
+                    .with_width(style.border_width)
+                    .with_color(style.border),
             );
-            if self.selected_index.is_some_and(|i| i == block.index) {
-                frame.stroke(
-                    &rect,
-                    Stroke::default().with_width(3.0).with_color(Color::WHITE),
-                );
-            }
 
             if block.rect.width >= 80.0 && block.rect.height >= 22.0 {
                 frame.fill_text(Text {
-                    content: format!("{}  {}", block.name, human_size(block.size)),
+                    content: format!(
+                        "{} {}  {}",
+                        if block.is_dir { "📁" } else { "📄" },
+                        block.name,
+                        human_size(block.size)
+                    ),
                     position: Point::new(block.rect.x + 4.0, block.rect.y + 14.0),
                     color: Color::WHITE,
                     size: iced::Pixels(13.0),

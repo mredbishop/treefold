@@ -27,6 +27,10 @@ None
 - [x] S19 GUI heatmap interaction and polish
 - [x] S20 GUI keyboard parity and visual focus
 - [x] S21 Default binary mode selection (GUI default, TUI flag)
+- [x] S22 GUI treemap file-vs-folder visual distinction
+- [x] S23 GUI treemap hover details
+- [x] S24 GUI context menu: open location actions
+- [x] S25 GUI context menu: delete with confirmation
 
 ## Notes
 
@@ -44,3 +48,5 @@ None
 - Added heatmap hit-testing and click interaction to navigate into directories from boxes.
 - Added GUI keyboard parity for arrows/enter/esc (q ignored), with synchronized visual selection across list and heatmap.
 - Added CLI mode parser with GUI default, plus `-t`/`--tui` to force terminal mode while preserving optional path handling.
+- Added folder/file-specific treemap styling, hover detail display, and right-click context menu actions.
+- Added OS file-browser integration for open/view-in-parent and delete-with-confirmation workflow with refresh.

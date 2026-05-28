@@ -5,8 +5,9 @@ use iced::keyboard::{Event as KeyEvent, Key, key::Named};
 use iced::widget::{button, column, container, row, scrollable, text, text_input};
 use iced::{Element, Length, Subscription, Task};
 
-use crate::fs_scan::scan_path;
-use crate::gui_heatmap::heatmap_canvas;
+use crate::fs_scan::{EntryKind, scan_path};
+use crate::gui_heatmap::{HeatmapEvent, heatmap_canvas};
+use crate::os_actions::{delete_path, open_in_file_browser};
 use crate::state::AppState;
 
 #[derive(Debug, Clone)]
@@ -16,8 +17,14 @@ pub enum Message {
     RefreshPressed,
     EnterChild(usize),
     HeatmapSelect(usize),
+    HeatmapEvent(HeatmapEvent),
     GoParent,
     EventOccurred(iced::Event),
+    OpenLocation,
+    RequestDelete,
+    ConfirmDelete,
+    CancelDelete,
+    ClearContext,
 }
 
 pub struct GuiApp {
@@ -25,6 +32,9 @@ pub struct GuiApp {
     state: Option<AppState>,
     error: Option<String>,
     selected_heatmap_index: Option<usize>,
+    hovered_heatmap_index: Option<usize>,
+    context_target: Option<usize>,
+    confirm_delete: bool,
 }
 
 impl Default for GuiApp {
@@ -41,6 +51,9 @@ impl GuiApp {
             state: None,
             error: None,
             selected_heatmap_index: None,
+            hovered_heatmap_index: None,
+            context_target: None,
+            confirm_delete: false,
         };
         app.scan_current_root();
         app
@@ -52,6 +65,9 @@ impl GuiApp {
                 self.state = Some(root);
                 self.error = None;
                 self.selected_heatmap_index = Some(0);
+                self.hovered_heatmap_index = None;
+                self.context_target = None;
+                self.confirm_delete = false;
             }
             Err(err) => {
                 self.error = Some(err);
@@ -82,6 +98,7 @@ pub fn update(app: &mut GuiApp, message: Message) -> Task<Message> {
                 state.selected_index = idx;
                 state.clamp_selection();
                 app.selected_heatmap_index = Some(state.selected_index);
+                app.context_target = None;
                 if state
                     .selected_child()
                     .is_some_and(|e| matches!(e.kind, crate::fs_scan::EntryKind::Directory))
@@ -96,6 +113,47 @@ pub fn update(app: &mut GuiApp, message: Message) -> Task<Message> {
                 state.clamp_selection();
                 app.selected_heatmap_index = Some(state.selected_index);
             }
+        }
+        Message::HeatmapEvent(event) => match event {
+            HeatmapEvent::Select(idx) => return update(app, Message::HeatmapSelect(idx)),
+            HeatmapEvent::Context(idx) => {
+                app.context_target = Some(idx);
+                app.selected_heatmap_index = Some(idx);
+                app.confirm_delete = false;
+            }
+            HeatmapEvent::Hover(idx) => app.hovered_heatmap_index = idx,
+        },
+        Message::OpenLocation => {
+            if let (Some(state), Some(idx)) = (app.state.as_ref(), app.context_target)
+                && let Some(entry) = state.current_children().get(idx)
+            {
+                let target = open_target_path(entry.kind, &entry.path);
+                if let Err(err) = open_in_file_browser(&target) {
+                    app.error = Some(err);
+                }
+            }
+            app.context_target = None;
+        }
+        Message::RequestDelete => app.confirm_delete = true,
+        Message::ConfirmDelete => {
+            if let (Some(state), Some(idx)) = (app.state.as_ref(), app.context_target)
+                && let Some(entry) = state.current_children().get(idx)
+            {
+                if let Err(err) =
+                    delete_path(&entry.path, matches!(entry.kind, EntryKind::Directory))
+                {
+                    app.error = Some(err);
+                } else {
+                    app.scan_current_root();
+                }
+            }
+            app.context_target = None;
+            app.confirm_delete = false;
+        }
+        Message::CancelDelete => app.confirm_delete = false,
+        Message::ClearContext => {
+            app.context_target = None;
+            app.confirm_delete = false;
         }
         Message::EventOccurred(event) => handle_gui_event(app, event),
     }
@@ -152,16 +210,36 @@ pub fn view(app: &GuiApp) -> Element<'_, Message> {
                 )
             })
             .unwrap_or_else(|| "Selected: none".to_string());
+        let hover_info = app
+            .hovered_heatmap_index
+            .and_then(|idx| state.current_children().get(idx))
+            .map(|e| {
+                format!(
+                    "Hover: {} | {} | {} | {}",
+                    e.name,
+                    if matches!(e.kind, EntryKind::Directory) {
+                        "folder"
+                    } else {
+                        "file"
+                    },
+                    crate::layout::human_size(e.size),
+                    e.path.display()
+                )
+            })
+            .unwrap_or_else(|| "Hover: none".to_string());
         let right = column![
             text("Heatmap (SequoiaView style)"),
             container(heatmap_canvas(
                 children.to_vec(),
                 app.selected_heatmap_index,
-                Message::HeatmapSelect
+                app.hovered_heatmap_index,
+                Message::HeatmapEvent
             ))
             .width(Length::Fill)
             .height(Length::Fill),
-            text(selected_info)
+            text(selected_info),
+            text(hover_info),
+            context_menu_view(app, state)
         ]
         .height(Length::Fill)
         .spacing(8);
@@ -182,6 +260,39 @@ pub fn view(app: &GuiApp) -> Element<'_, Message> {
         root = root.push(text(format!("Error: {err}")));
     }
     root.into()
+}
+
+fn context_menu_view<'a>(app: &'a GuiApp, state: &'a AppState) -> Element<'a, Message> {
+    let Some(idx) = app.context_target else {
+        return container(text("")).into();
+    };
+    let Some(entry) = state.current_children().get(idx) else {
+        return container(text("")).into();
+    };
+
+    let open_label = context_open_label(entry.kind);
+    let delete_label = context_delete_label(entry.kind);
+    let mut col = column![
+        text(format!("Context: {}", entry.path.display())),
+        row![
+            button(open_label).on_press(Message::OpenLocation),
+            button(delete_label).on_press(Message::RequestDelete),
+            button("Close").on_press(Message::ClearContext),
+        ]
+        .spacing(8)
+    ]
+    .spacing(6);
+    if app.confirm_delete {
+        col = col.push(text("Confirm delete? This cannot be undone."));
+        col = col.push(
+            row![
+                button("Confirm delete").on_press(Message::ConfirmDelete),
+                button("Cancel").on_press(Message::CancelDelete)
+            ]
+            .spacing(8),
+        );
+    }
+    container(col).into()
 }
 
 pub fn run() -> iced::Result {
@@ -211,6 +322,30 @@ fn gui_title(_: &GuiApp) -> String {
 
 fn subscription(_state: &GuiApp) -> Subscription<Message> {
     event::listen().map(Message::EventOccurred)
+}
+
+pub fn context_open_label(kind: EntryKind) -> &'static str {
+    if matches!(kind, EntryKind::Directory) {
+        "Open this directory"
+    } else {
+        "View in parent"
+    }
+}
+
+pub fn context_delete_label(kind: EntryKind) -> &'static str {
+    if matches!(kind, EntryKind::Directory) {
+        "Delete this folder"
+    } else {
+        "Delete this file"
+    }
+}
+
+pub fn open_target_path(kind: EntryKind, path: &std::path::Path) -> std::path::PathBuf {
+    if matches!(kind, EntryKind::Directory) {
+        path.to_path_buf()
+    } else {
+        path.parent().unwrap_or(path).to_path_buf()
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

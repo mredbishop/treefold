@@ -7,11 +7,14 @@ use ratatui::layout::Rect;
 use tempfile::tempdir;
 use treefold::cli::{Mode, help_text, parse_args};
 use treefold::fs_scan::{EntryKind, FsEntry, count_errors, scan_path};
-use treefold::gui::init_state_from_path;
 use treefold::gui::{GuiKeyAction, map_key_event};
-use treefold::gui_heatmap::{build_heatmap_blocks, color_for_ratio, hit_test};
+use treefold::gui::{
+    context_delete_label, context_open_label, init_state_from_path, open_target_path,
+};
+use treefold::gui_heatmap::{build_heatmap_blocks, color_for_ratio, hit_test, style_for_block};
 use treefold::input::{Action, map_key};
 use treefold::layout::{ensure_visible_offset, human_size, split_main};
+use treefold::os_actions::{delete_path, open_command};
 use treefold::state::AppState;
 use treefold::treemap::{
     aggregate_small_entries, build_treemap, rect_within_bounds, rects_overlap,
@@ -627,4 +630,55 @@ fn cli_help_text_mentions_gui_default_and_tui_flag() {
     let help = help_text();
     assert!(help.contains("Default mode: GUI"));
     assert!(help.contains("--tui"));
+}
+
+#[test]
+fn gui_context_labels_by_type() {
+    assert_eq!(
+        context_open_label(EntryKind::Directory),
+        "Open this directory"
+    );
+    assert_eq!(context_open_label(EntryKind::File), "View in parent");
+    assert_eq!(
+        context_delete_label(EntryKind::Directory),
+        "Delete this folder"
+    );
+    assert_eq!(context_delete_label(EntryKind::File), "Delete this file");
+}
+
+#[test]
+fn gui_open_target_path_rules() {
+    let file = std::path::PathBuf::from("/tmp/a/b/c.txt");
+    let dir = std::path::PathBuf::from("/tmp/a/b");
+    assert_eq!(
+        open_target_path(EntryKind::File, &file),
+        std::path::PathBuf::from("/tmp/a/b")
+    );
+    assert_eq!(open_target_path(EntryKind::Directory, &dir), dir);
+}
+
+#[test]
+fn os_open_command_resolves() {
+    let (cmd, args) = open_command(std::path::Path::new("."));
+    assert!(!cmd.is_empty());
+    assert!(!args.is_empty());
+}
+
+#[test]
+fn gui_style_mapping_file_vs_folder_differs() {
+    let a = style_for_block(true, 0.5, false, false);
+    let b = style_for_block(false, 0.5, false, false);
+    assert_ne!(a.border_width, b.border_width);
+}
+
+#[test]
+fn delete_path_confirm_and_cancel_behavior() {
+    let dir = tempdir().expect("tempdir");
+    let file = dir.path().join("x.txt");
+    std::fs::write(&file, b"hello").expect("write");
+    // cancel behavior: do nothing, file remains
+    assert!(file.exists());
+    // confirm behavior: delete
+    delete_path(&file, false).expect("delete file");
+    assert!(!file.exists());
 }

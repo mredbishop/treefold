@@ -5,6 +5,7 @@ pub mod gui;
 pub mod gui_heatmap;
 pub mod input;
 pub mod layout;
+pub mod os_actions;
 pub mod state;
 pub mod treemap;
 pub mod ui;
