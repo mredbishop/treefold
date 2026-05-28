@@ -106,6 +106,7 @@ None
 - [ ] S18 GUI box heatmap treemap renderer
 - [ ] S19 GUI heatmap interaction and polish
 - [ ] S20 GUI keyboard parity and visual focus
+- [ ] S21 Default binary mode selection (GUI default, TUI flag)
 
 ## Notes
 
@@ -841,6 +842,47 @@ As a GUI user, I want the same navigation keys as the TUI (arrow keys, `Enter`, 
 
 * Reuse existing navigation/state methods from shared app state where possible.
 * Keep key mapping in a small pure helper for deterministic tests.
+
+---
+
+## S21 Default binary mode selection (GUI default, TUI flag)
+
+### User Story
+
+As a user, I want the compiled `treefold` binary to launch the GUI by default, with an explicit `-t` or `--tui` flag to run terminal mode when needed.
+
+### Acceptance Criteria
+
+* Running `treefold` with no mode flags starts GUI mode by default.
+* Running `treefold -t` starts TUI mode.
+* Running `treefold --tui` starts TUI mode.
+* Existing optional path argument continues to work in both modes.
+* `--help` clearly documents:
+
+  * default GUI behavior
+  * `-t` / `--tui` behavior
+  * path argument usage
+* Invalid or conflicting mode arguments produce a clear, non-zero error.
+
+### Tests
+
+* CLI argument parsing unit tests for:
+
+  * default -> GUI
+  * `-t` -> TUI
+  * `--tui` -> TUI
+  * optional path parsing in both modes
+* Help output test includes GUI default and TUI flag descriptions.
+* Smoke run tests:
+
+  * `cargo run -- --help`
+  * `cargo run -- -t .`
+  * `cargo run -- .` (GUI default, manual verification)
+
+### Implementation Notes
+
+* Keep mode parsing isolated in a small parser/helper to keep entrypoint logic clean.
+* Preserve existing TUI behavior and keybindings when `--tui` is used.
 
 ---
 

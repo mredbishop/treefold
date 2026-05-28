@@ -1,4 +1,5 @@
 pub mod app;
+pub mod cli;
 pub mod fs_scan;
 pub mod gui;
 pub mod gui_heatmap;

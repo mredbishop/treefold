@@ -30,7 +30,12 @@ pub struct GuiApp {
 impl Default for GuiApp {
     fn default() -> Self {
         let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
-        let root_input = cwd.display().to_string();
+        Self::with_root_input(cwd.display().to_string())
+    }
+}
+
+impl GuiApp {
+    fn with_root_input(root_input: String) -> Self {
         let mut app = Self {
             root_input,
             state: None,
@@ -40,9 +45,7 @@ impl Default for GuiApp {
         app.scan_current_root();
         app
     }
-}
 
-impl GuiApp {
     fn scan_current_root(&mut self) {
         match init_state_from_path(self.root_input.trim()) {
             Ok(root) => {
@@ -182,10 +185,24 @@ pub fn view(app: &GuiApp) -> Element<'_, Message> {
 }
 
 pub fn run() -> iced::Result {
-    iced::application(GuiApp::default, update, view)
-        .title(gui_title)
-        .subscription(subscription)
-        .run()
+    run_with_path(None)
+}
+
+pub fn run_with_path(path: Option<PathBuf>) -> iced::Result {
+    iced::application(
+        move || {
+            if let Some(path) = path.clone() {
+                GuiApp::with_root_input(path.display().to_string())
+            } else {
+                GuiApp::default()
+            }
+        },
+        update,
+        view,
+    )
+    .title(gui_title)
+    .subscription(subscription)
+    .run()
 }
 
 fn gui_title(_: &GuiApp) -> String {

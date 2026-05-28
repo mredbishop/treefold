@@ -26,6 +26,7 @@ None
 - [x] S18 GUI box heatmap treemap renderer
 - [x] S19 GUI heatmap interaction and polish
 - [x] S20 GUI keyboard parity and visual focus
+- [x] S21 Default binary mode selection (GUI default, TUI flag)
 
 ## Notes
 
@@ -42,3 +43,4 @@ None
 - Replaced GUI usage bars with a SequoiaView-style heatmap canvas backed by treemap layout + heat color scaling.
 - Added heatmap hit-testing and click interaction to navigate into directories from boxes.
 - Added GUI keyboard parity for arrows/enter/esc (q ignored), with synchronized visual selection across list and heatmap.
+- Added CLI mode parser with GUI default, plus `-t`/`--tui` to force terminal mode while preserving optional path handling.

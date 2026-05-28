@@ -14,7 +14,13 @@ cargo build
 cargo run -- <optional-path>
 ```
 
-If no path is supplied, `treefold` scans the current working directory.
+Default mode is GUI. If no path is supplied, `treefold` scans the current working directory.
+
+Run in TUI mode:
+
+```bash
+cargo run -- --tui <optional-path>
+```
 
 ## Controls
 

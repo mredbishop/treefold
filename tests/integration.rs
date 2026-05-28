@@ -5,6 +5,7 @@ use ratatui::Terminal;
 use ratatui::backend::TestBackend;
 use ratatui::layout::Rect;
 use tempfile::tempdir;
+use treefold::cli::{Mode, help_text, parse_args};
 use treefold::fs_scan::{EntryKind, FsEntry, count_errors, scan_path};
 use treefold::gui::init_state_from_path;
 use treefold::gui::{GuiKeyAction, map_key_event};
@@ -597,4 +598,33 @@ fn gui_key_mapping_parity() {
     assert_eq!(map_key_event(&enter), GuiKeyAction::Enter);
     assert_eq!(map_key_event(&esc), GuiKeyAction::Back);
     assert_eq!(map_key_event(&q), GuiKeyAction::None);
+}
+
+#[test]
+fn cli_defaults_to_gui() {
+    let parsed = parse_args(Vec::<String>::new()).expect("parse");
+    assert_eq!(parsed.mode, Mode::Gui);
+    assert!(parsed.path.is_none());
+}
+
+#[test]
+fn cli_tui_short_and_long_flag() {
+    let parsed_short = parse_args(["-t"]).expect("parse short");
+    assert_eq!(parsed_short.mode, Mode::Tui);
+    let parsed_long = parse_args(["--tui"]).expect("parse long");
+    assert_eq!(parsed_long.mode, Mode::Tui);
+}
+
+#[test]
+fn cli_path_parsing() {
+    let parsed = parse_args(["-t", "."]).expect("parse");
+    assert_eq!(parsed.mode, Mode::Tui);
+    assert_eq!(parsed.path.expect("path"), std::path::PathBuf::from("."));
+}
+
+#[test]
+fn cli_help_text_mentions_gui_default_and_tui_flag() {
+    let help = help_text();
+    assert!(help.contains("Default mode: GUI"));
+    assert!(help.contains("--tui"));
 }

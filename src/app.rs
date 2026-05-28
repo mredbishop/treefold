@@ -17,8 +17,7 @@ use crate::layout::ensure_visible_offset;
 use crate::state::AppState;
 use crate::ui::{render, status_line};
 
-pub fn run() -> Result<()> {
-    let path = parse_root_arg()?;
+pub fn run_with_path(path: PathBuf) -> Result<()> {
     let root = scan_path(&path)
         .map_err(|e| anyhow!(e))
         .context("initial scan failed")?;
@@ -57,23 +56,6 @@ pub fn run() -> Result<()> {
     }
 
     Ok(())
-}
-
-fn parse_root_arg() -> Result<PathBuf> {
-    let mut args = std::env::args().skip(1);
-    if let Some(arg) = args.next() {
-        if arg == "--help" || arg == "-h" {
-            println!("treefold <optional-path>\n\nControls: arrows/hjkl, enter/l, esc/h, r, q");
-            std::process::exit(0);
-        }
-        let path = PathBuf::from(arg);
-        if !path.exists() {
-            return Err(anyhow!("invalid path: {}", path.display()));
-        }
-        Ok(path)
-    } else {
-        Ok(std::env::current_dir()?)
-    }
 }
 
 struct TerminalGuard {
