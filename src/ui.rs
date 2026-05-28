@@ -69,8 +69,14 @@ fn render_treemap(frame: &mut Frame<'_>, state: &AppState, area: Rect) {
         } else {
             Style::default()
         };
+        if b.rect.width < 3 || b.rect.height < 3 {
+            // Avoid border glyph artifacts in tiny edge rectangles.
+            frame.render_widget(Clear, b.rect);
+            frame.render_widget(Block::default().style(style), b.rect);
+            continue;
+        }
         let title = if b.rect.width > 4 && b.rect.height > 2 {
-            truncate_label(&b.name, b.rect.width.saturating_sub(2) as usize)
+            format_treemap_label(&b.name, b.size, b.rect.width.saturating_sub(2) as usize)
         } else {
             String::new()
         };
@@ -110,6 +116,26 @@ fn truncate_label(input: &str, width: usize) -> String {
     }
     out.push('…');
     out
+}
+
+pub fn format_treemap_label(name: &str, size: u64, width: usize) -> String {
+    if width == 0 {
+        return String::new();
+    }
+    let size_text = human_size(size);
+    let full = format!("{name}  {size_text}");
+    if full.chars().count() <= width {
+        return full;
+    }
+
+    let reserved_for_size = size_text.chars().count() + 2;
+    if width > reserved_for_size {
+        let name_width = width - reserved_for_size;
+        let truncated_name = truncate_label(name, name_width);
+        return format!("{truncated_name}  {size_text}");
+    }
+
+    truncate_label(name, width)
 }
 
 pub fn status_line(state: &AppState, error_count: usize) -> String {

@@ -10,7 +10,7 @@ use treefold::input::{Action, map_key};
 use treefold::layout::{ensure_visible_offset, human_size, split_main};
 use treefold::state::AppState;
 use treefold::treemap::{build_treemap, rect_within_bounds, rects_overlap};
-use treefold::ui::{render, status_line, treemap_fallback_message};
+use treefold::ui::{format_treemap_label, render, status_line, treemap_fallback_message};
 
 fn key(code: KeyCode, modifiers: KeyModifiers) -> KeyEvent {
     KeyEvent::new(code, modifiers)
@@ -331,4 +331,19 @@ fn render_smoke_empty_and_selected() {
 
     let status = status_line(&state, count_errors(&state.root));
     assert!(status.contains("errors: 0"));
+}
+
+#[test]
+fn treemap_label_formatting_handles_size_and_truncation() {
+    let large = format_treemap_label("dependencies", 1024 * 1024, 40);
+    assert!(large.contains("dependencies"));
+    assert!(large.contains("1.0 MiB"));
+
+    let medium = format_treemap_label("dependencies", 1024 * 1024, 16);
+    assert!(medium.contains("1.0 MiB"));
+    assert!(medium.contains('…'));
+
+    let small = format_treemap_label("dependencies", 1024 * 1024, 6);
+    assert!(!small.contains("MiB"));
+    assert!(small.chars().count() <= 6);
 }

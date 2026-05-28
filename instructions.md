@@ -93,9 +93,10 @@ None
 - [ ] S6 Treemap layout algorithm
 - [ ] S7 Treemap rendering
 - [ ] S8 Treemap fit-to-panel behaviour
-- [ ] S9 Cross-platform terminal lifecycle
-- [ ] S10 Error handling and permissions
-- [ ] S11 Polish, docs, and release checks
+- [ ] S9 Treemap container size labels
+- [ ] S10 Cross-platform terminal lifecycle
+- [ ] S11 Error handling and permissions
+- [ ] S12 Polish, docs, and release checks
 
 ## Notes
 
@@ -433,7 +434,38 @@ As a user, I want the treemap to use all available space in the right panel with
 
 ---
 
-## S9 Cross-platform terminal lifecycle
+## S9 Treemap container size labels
+
+### User Story
+
+As a user, I want each treemap container to show its size so I can read exact disk usage values without leaving the visual view.
+
+### Acceptance Criteria
+
+* Treemap blocks display both name and human-readable size when space allows.
+* Label format is consistent (for example: `<name>  <size>`).
+* Labels are truncated safely to fit container width.
+* For small containers, size text is omitted gracefully instead of overflowing or corrupting borders.
+* Selected container remains visually distinct even when showing size text.
+
+### Tests
+
+* Rendering smoke test verifies size text appears in sufficiently large treemap blocks.
+* Unit test for label formatter/truncation includes:
+
+  * large width: full name + size visible
+  * medium width: truncated name + visible size
+  * small width: omit size and avoid overflow
+* Regression test confirms no panic on narrow/tiny blocks with size labels enabled.
+
+### Implementation Notes
+
+* Reuse existing `human_size` formatting for consistency with the left panel/status bar.
+* Keep label composition in a small pure helper so it can be unit-tested.
+
+---
+
+## S10 Cross-platform terminal lifecycle
 
 ### User Story
 
@@ -460,7 +492,7 @@ As a user, I want the app to reliably enter and leave terminal UI mode.
 
 ---
 
-## S10 Error handling and permissions
+## S11 Error handling and permissions
 
 ### User Story
 
@@ -486,7 +518,7 @@ As a user, I want scan errors to be visible but non-fatal.
 
 ---
 
-## S11 Polish, docs, and release checks
+## S12 Polish, docs, and release checks
 
 ### User Story
 

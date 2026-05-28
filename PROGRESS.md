@@ -14,9 +14,10 @@ None
 - [x] S6 Treemap layout algorithm
 - [x] S7 Treemap rendering
 - [x] S8 Treemap fit-to-panel behaviour
-- [x] S9 Cross-platform terminal lifecycle
-- [x] S10 Error handling and permissions
-- [x] S11 Polish, docs, and release checks
+- [x] S9 Treemap container size labels
+- [x] S10 Cross-platform terminal lifecycle
+- [x] S11 Error handling and permissions
+- [x] S12 Polish, docs, and release checks
 
 ## Notes
 
@@ -24,3 +25,4 @@ None
 - Implemented list + treemap split layout (33/67) with status bar.
 - Terminal lifecycle is managed via `TerminalGuard` and cleaned up on drop.
 - Treemap blocks are clipped to panel bounds, tiny panel fallback message added, and fit/overlap/utilization tests added.
+- Treemap labels now show container size where width allows, with tested truncation and small-block fallback.
