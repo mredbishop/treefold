@@ -112,6 +112,8 @@ None
 - [ ] S24 GUI context menu: open location actions
 - [ ] S25 GUI context menu: delete with confirmation
 - [ ] S26 GUI start location and path selection UX
+- [ ] S27 GUI scan-in-progress loader and interaction policy
+- [ ] S28 GUI live scan progress output (current subfolder)
 
 ## Notes
 
@@ -1041,6 +1043,73 @@ As a GUI user, I want the app to open in my home directory by default, while sti
 * Keep path-resolution and validation in a testable helper.
 * Abstract folder-picker integration behind a small adapter to keep platform differences isolated.
 * Preserve CLI path override behavior: explicit path argument should still take precedence over GUI default home path.
+
+---
+
+## S27 GUI scan-in-progress loader and interaction policy
+
+### User Story
+
+As a GUI user, I want a clear loader while scanning is in progress so I know the app is working and not frozen.
+
+### Acceptance Criteria
+
+* When a scan starts, GUI shows an explicit loading indicator (spinner/progress text/overlay).
+* Loading state clearly indicates which path is being scanned.
+* While scanning, interaction policy is explicit and consistent:
+
+  * either disable conflicting actions (recommended), or
+  * allow safe interactions but prevent confusing stale-state actions
+* Scan completion hides loader and updates list/treemap atomically.
+* Scan failure hides loader and shows non-fatal error state.
+* Repeated scans (path change/refresh) do not leave loader stuck.
+
+### Tests
+
+* Unit tests for scan state transitions:
+
+  * idle -> scanning -> success -> idle
+  * idle -> scanning -> error -> idle
+* GUI interaction test verifies loader visibility during async scan.
+* Regression test ensures no stale loader after rapid scan requests.
+
+### Implementation Notes
+
+* Track scan lifecycle in explicit GUI state (for example `is_scanning` + `scan_path`).
+* Use a request token/version to ignore stale async scan completions.
+* Keep loader rendering separate from data rendering to avoid partial-update flicker.
+
+---
+
+## S28 GUI live scan progress output (current subfolder)
+
+### User Story
+
+As a GUI user, I want to see live progress showing which subfolder is currently being scanned so long scans feel transparent and trustworthy.
+
+### Acceptance Criteria
+
+* During scan, GUI displays active progress text with the current subfolder/path being processed.
+* Progress text updates continuously as scanning advances through subfolders.
+* Progress display is cleared or finalized when scan completes or fails.
+* Progress updates are tied to the active scan request only (no stale updates from previous scans).
+* UI remains responsive while progress updates are shown.
+
+### Tests
+
+* Unit tests for scan-progress state transitions:
+
+  * start scan -> progress updates -> complete
+  * start scan -> progress updates -> error
+  * stale progress events are ignored when request id no longer matches
+* GUI logic test verifies progress text changes when progress events are received.
+* Regression test ensures rapid scan restarts do not interleave progress output incorrectly.
+
+### Implementation Notes
+
+* Introduce scanner progress callback/event channel (for example periodic message with current path).
+* Keep progress events lightweight and throttled if needed to avoid UI flooding.
+* Preserve non-fatal error behavior and request-token guard for async scans.
 
 ---
 

@@ -717,3 +717,31 @@ fn gui_manual_invalid_path_returns_error() {
     let result = init_state_from_path(bad);
     assert!(result.is_err());
 }
+
+#[cfg(unix)]
+#[test]
+fn scanner_does_not_recurse_symlink_loops() {
+    use std::os::unix::fs::symlink;
+
+    let dir = tempdir().expect("tempdir");
+    let root = dir.path();
+    let sub = root.join("sub");
+    std::fs::create_dir(&sub).expect("mkdir");
+    std::fs::write(sub.join("a.txt"), b"abc").expect("write");
+    symlink(root, sub.join("loop_to_root")).expect("symlink");
+
+    let scanned = scan_path(root).expect("scan");
+    let sub_entry = scanned
+        .children
+        .iter()
+        .find(|c| c.name == "sub")
+        .expect("sub");
+    let loop_entry = sub_entry
+        .children
+        .iter()
+        .find(|c| c.name == "loop_to_root")
+        .expect("loop");
+
+    assert_eq!(loop_entry.kind, EntryKind::File);
+    assert!(loop_entry.children.is_empty());
+}

@@ -34,11 +34,24 @@ pub fn scan_path(path: &Path) -> Result<FsEntry, ScanError> {
     if !path.exists() {
         return Err(ScanError::NotFound(path.to_path_buf()));
     }
-    scan_node(path)
+    scan_node(path, &mut |_| {})
 }
 
-fn scan_node(path: &Path) -> Result<FsEntry, ScanError> {
-    let metadata = fs::metadata(path).map_err(|source| ScanError::Metadata {
+pub fn scan_path_with_progress<F>(path: &Path, progress: &mut F) -> Result<FsEntry, ScanError>
+where
+    F: FnMut(&Path),
+{
+    if !path.exists() {
+        return Err(ScanError::NotFound(path.to_path_buf()));
+    }
+    scan_node(path, progress)
+}
+
+fn scan_node<F>(path: &Path, progress: &mut F) -> Result<FsEntry, ScanError>
+where
+    F: FnMut(&Path),
+{
+    let metadata = fs::symlink_metadata(path).map_err(|source| ScanError::Metadata {
         path: path.to_path_buf(),
         source,
     })?;
@@ -48,7 +61,7 @@ fn scan_node(path: &Path) -> Result<FsEntry, ScanError> {
         .map(|s| s.to_string_lossy().to_string())
         .unwrap_or_else(|| path.display().to_string());
 
-    if metadata.is_file() {
+    if metadata.is_file() || metadata.file_type().is_symlink() {
         return Ok(FsEntry {
             path: path.to_path_buf(),
             name,
@@ -61,13 +74,14 @@ fn scan_node(path: &Path) -> Result<FsEntry, ScanError> {
 
     let mut errors = Vec::new();
     let mut children = Vec::new();
+    progress(path);
 
     let read_dir = fs::read_dir(path);
     match read_dir {
         Ok(entries) => {
             for entry_result in entries {
                 match entry_result {
-                    Ok(entry) => match scan_node(&entry.path()) {
+                    Ok(entry) => match scan_node(&entry.path(), progress) {
                         Ok(node) => children.push(node),
                         Err(err) => errors.push(err.to_string()),
                     },

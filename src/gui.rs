@@ -1,4 +1,6 @@
 use std::path::PathBuf;
+use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
 use iced::event;
 use iced::keyboard::{Event as KeyEvent, Key, key::Named};
@@ -16,7 +18,12 @@ pub enum Message {
     ScanPressed,
     RefreshPressed,
     BrowsePressed,
-    ScanCompleted(Result<AppState, String>, String),
+    ScanCompleted {
+        request_id: u64,
+        result: Result<AppState, String>,
+        root_input: String,
+    },
+    ScanProgressTick,
     EnterChild(usize),
     HeatmapSelect(usize),
     HeatmapEvent(HeatmapEvent),
@@ -37,6 +44,11 @@ pub struct GuiApp {
     hovered_heatmap_index: Option<usize>,
     context_target: Option<usize>,
     confirm_delete: bool,
+    is_scanning: bool,
+    scanning_path: Option<String>,
+    scanning_current_subfolder: Option<String>,
+    progress_shared: Option<Arc<Mutex<Option<String>>>>,
+    scan_request_id: u64,
 }
 
 impl Default for GuiApp {
@@ -56,6 +68,11 @@ impl GuiApp {
             hovered_heatmap_index: None,
             context_target: None,
             confirm_delete: false,
+            is_scanning: false,
+            scanning_path: None,
+            scanning_current_subfolder: None,
+            progress_shared: None,
+            scan_request_id: 0,
         }
     }
 
@@ -74,6 +91,10 @@ impl GuiApp {
                 self.error = Some(err);
             }
         }
+        self.is_scanning = false;
+        self.scanning_path = None;
+        self.scanning_current_subfolder = None;
+        self.progress_shared = None;
     }
 }
 
@@ -102,29 +123,44 @@ pub fn init_state_from_path(path: &str) -> Result<AppState, String> {
 
 pub fn update(app: &mut GuiApp, message: Message) -> Task<Message> {
     match message {
-        Message::RootChanged(value) => app.root_input = value,
-        Message::ScanPressed | Message::RefreshPressed => {
-            let path = app.root_input.trim().to_string();
-            let run_path = path.clone();
-            let done_path = path;
-            return Task::perform(
-                async move { init_state_from_path(&run_path) },
-                move |result| Message::ScanCompleted(result, done_path.clone()),
-            );
-        }
-        Message::BrowsePressed => {
-            if let Some(path) = rfd::FileDialog::new().pick_folder() {
-                let path_str = path.display().to_string();
-                let run_path = path_str.clone();
-                let done_path = path_str;
-                return Task::perform(
-                    async move { init_state_from_path(&run_path) },
-                    move |result| Message::ScanCompleted(result, done_path.clone()),
-                );
+        Message::RootChanged(value) => {
+            if !app.is_scanning {
+                app.root_input = value;
             }
         }
-        Message::ScanCompleted(result, root_input) => app.apply_loaded_state(root_input, result),
+        Message::ScanPressed | Message::RefreshPressed => {
+            let path = app.root_input.trim().to_string();
+            return start_scan(app, path);
+        }
+        Message::BrowsePressed => {
+            if app.is_scanning {
+                return Task::none();
+            }
+            if let Some(path) = rfd::FileDialog::new().pick_folder() {
+                return start_scan(app, path.display().to_string());
+            }
+        }
+        Message::ScanCompleted {
+            request_id,
+            result,
+            root_input,
+        } => {
+            if request_id == app.scan_request_id {
+                app.apply_loaded_state(root_input, result);
+            }
+        }
+        Message::ScanProgressTick => {
+            if app.is_scanning
+                && let Some(shared) = &app.progress_shared
+                && let Ok(lock) = shared.lock()
+            {
+                app.scanning_current_subfolder = lock.clone();
+            }
+        }
         Message::EnterChild(idx) => {
+            if app.is_scanning {
+                return Task::none();
+            }
             if let Some(state) = app.state.as_mut() {
                 state.selected_index = idx;
                 state.enter_selected();
@@ -133,6 +169,9 @@ pub fn update(app: &mut GuiApp, message: Message) -> Task<Message> {
             }
         }
         Message::HeatmapSelect(idx) => {
+            if app.is_scanning {
+                return Task::none();
+            }
             if let Some(state) = app.state.as_mut() {
                 state.selected_index = idx;
                 state.clamp_selection();
@@ -140,13 +179,16 @@ pub fn update(app: &mut GuiApp, message: Message) -> Task<Message> {
                 app.context_target = None;
                 if state
                     .selected_child()
-                    .is_some_and(|e| matches!(e.kind, crate::fs_scan::EntryKind::Directory))
+                    .is_some_and(|e| matches!(e.kind, EntryKind::Directory))
                 {
                     state.enter_selected();
                 }
             }
         }
         Message::GoParent => {
+            if app.is_scanning {
+                return Task::none();
+            }
             if let Some(state) = app.state.as_mut() {
                 state.go_parent();
                 state.clamp_selection();
@@ -156,6 +198,9 @@ pub fn update(app: &mut GuiApp, message: Message) -> Task<Message> {
         Message::HeatmapEvent(event) => match event {
             HeatmapEvent::Select(idx) => return update(app, Message::HeatmapSelect(idx)),
             HeatmapEvent::Context(idx) => {
+                if app.is_scanning {
+                    return Task::none();
+                }
                 app.context_target = Some(idx);
                 app.selected_heatmap_index = Some(idx);
                 app.confirm_delete = false;
@@ -163,6 +208,9 @@ pub fn update(app: &mut GuiApp, message: Message) -> Task<Message> {
             HeatmapEvent::Hover(idx) => app.hovered_heatmap_index = idx,
         },
         Message::OpenLocation => {
+            if app.is_scanning {
+                return Task::none();
+            }
             if let (Some(state), Some(idx)) = (app.state.as_ref(), app.context_target)
                 && let Some(entry) = state.current_children().get(idx)
             {
@@ -175,6 +223,9 @@ pub fn update(app: &mut GuiApp, message: Message) -> Task<Message> {
         }
         Message::RequestDelete => app.confirm_delete = true,
         Message::ConfirmDelete => {
+            if app.is_scanning {
+                return Task::none();
+            }
             if let (Some(state), Some(idx)) = (app.state.as_ref(), app.context_target)
                 && let Some(entry) = state.current_children().get(idx)
             {
@@ -183,13 +234,7 @@ pub fn update(app: &mut GuiApp, message: Message) -> Task<Message> {
                 {
                     app.error = Some(err);
                 } else {
-                    let path = app.root_input.trim().to_string();
-                    let run_path = path.clone();
-                    let done_path = path;
-                    return Task::perform(
-                        async move { init_state_from_path(&run_path) },
-                        move |result| Message::ScanCompleted(result, done_path.clone()),
-                    );
+                    return start_scan(app, app.root_input.trim().to_string());
                 }
             }
             app.context_target = None;
@@ -206,18 +251,55 @@ pub fn update(app: &mut GuiApp, message: Message) -> Task<Message> {
 }
 
 pub fn view(app: &GuiApp) -> Element<'_, Message> {
-    let controls = row![
+    let path_input = if app.is_scanning {
+        text_input("Path", &app.root_input)
+            .padding(8)
+            .width(Length::Fill)
+    } else {
         text_input("Path", &app.root_input)
             .on_input(Message::RootChanged)
             .on_submit(Message::ScanPressed)
             .padding(8)
-            .width(Length::Fill),
-        button("Scan").on_press(Message::ScanPressed),
-        button("Browse").on_press(Message::BrowsePressed),
-        button("Refresh").on_press(Message::RefreshPressed),
-        button("Up").on_press(Message::GoParent),
+            .width(Length::Fill)
+    };
+
+    let controls = row![
+        path_input,
+        if app.is_scanning {
+            button("Scan")
+        } else {
+            button("Scan").on_press(Message::ScanPressed)
+        },
+        if app.is_scanning {
+            button("Browse")
+        } else {
+            button("Browse").on_press(Message::BrowsePressed)
+        },
+        if app.is_scanning {
+            button("Refresh")
+        } else {
+            button("Refresh").on_press(Message::RefreshPressed)
+        },
+        if app.is_scanning {
+            button("Up")
+        } else {
+            button("Up").on_press(Message::GoParent)
+        },
     ]
     .spacing(8);
+
+    let loading = if app.is_scanning {
+        text(format!(
+            "Scanning in progress: {}{}",
+            app.scanning_path.as_deref().unwrap_or("<unknown>"),
+            app.scanning_current_subfolder
+                .as_ref()
+                .map(|p| format!(" | current: {p}"))
+                .unwrap_or_default()
+        ))
+    } else {
+        text("")
+    };
 
     let body: Element<'_, Message> = if let Some(state) = &app.state {
         let children = state.current_children();
@@ -225,8 +307,8 @@ pub fn view(app: &GuiApp) -> Element<'_, Message> {
             column![text(format!("Current: {}", state.current_dir.display()))].spacing(6);
         for (idx, child) in children.iter().enumerate() {
             let kind = match child.kind {
-                crate::fs_scan::EntryKind::Directory => "d",
-                crate::fs_scan::EntryKind::File => "f",
+                EntryKind::Directory => "d",
+                EntryKind::File => "f",
             };
             list_col = list_col.push(
                 button(text(format!(
@@ -298,10 +380,13 @@ pub fn view(app: &GuiApp) -> Element<'_, Message> {
         .spacing(10)
         .into()
     } else {
-        container(text("No data")).into()
+        container(text("Loading..."))
+            .width(Length::Fill)
+            .height(Length::Fill)
+            .into()
     };
 
-    let mut root = column![controls, body].spacing(10).padding(10);
+    let mut root = column![controls, loading, body].spacing(10).padding(10);
     if let Some(err) = &app.error {
         root = root.push(text(format!("Error: {err}")));
     }
@@ -352,14 +437,21 @@ pub fn run_with_path(path: Option<PathBuf>) -> iced::Result {
 
     iced::application(
         move || {
-            let app = GuiApp::with_root_input(initial_root.clone());
-            let scan_path = initial_root.clone();
+            let mut app = GuiApp::with_root_input(initial_root.clone());
+            app.is_scanning = true;
+            app.scanning_path = Some(initial_root.clone());
+            app.scan_request_id = 1;
+            let run_path = initial_root.clone();
             let done_path = initial_root.clone();
             (
                 app,
                 Task::perform(
-                    async move { init_state_from_path(&scan_path) },
-                    move |result| Message::ScanCompleted(result, done_path.clone()),
+                    async move { init_state_from_path(&run_path) },
+                    move |result| Message::ScanCompleted {
+                        request_id: 1,
+                        result,
+                        root_input: done_path.clone(),
+                    },
                 ),
             )
         },
@@ -376,7 +468,10 @@ fn gui_title(_: &GuiApp) -> String {
 }
 
 fn subscription(_state: &GuiApp) -> Subscription<Message> {
-    event::listen().map(Message::EventOccurred)
+    Subscription::batch(vec![
+        event::listen().map(Message::EventOccurred),
+        iced::time::every(Duration::from_millis(120)).map(|_| Message::ScanProgressTick),
+    ])
 }
 
 pub fn context_open_label(kind: EntryKind) -> &'static str {
@@ -426,6 +521,10 @@ pub fn map_key_event(event: &iced::Event) -> GuiKeyAction {
 }
 
 fn handle_gui_event(app: &mut GuiApp, event: iced::Event) {
+    if app.is_scanning {
+        return;
+    }
+
     let action = map_key_event(&event);
     let Some(state) = app.state.as_mut() else {
         return;
@@ -445,4 +544,35 @@ fn handle_gui_event(app: &mut GuiApp, event: iced::Event) {
     }
     state.clamp_selection();
     app.selected_heatmap_index = Some(state.selected_index);
+}
+
+fn start_scan(app: &mut GuiApp, path: String) -> Task<Message> {
+    app.scan_request_id = app.scan_request_id.saturating_add(1);
+    let request_id = app.scan_request_id;
+    app.is_scanning = true;
+    app.scanning_path = Some(path.clone());
+    app.scanning_current_subfolder = None;
+    let shared_progress: Arc<Mutex<Option<String>>> = Arc::new(Mutex::new(None));
+    app.progress_shared = Some(shared_progress.clone());
+    let run_path = path.clone();
+    let done_path = path;
+    let progress_sink = shared_progress;
+
+    Task::perform(
+        async move {
+            let mut cb = |p: &std::path::Path| {
+                if let Ok(mut lock) = progress_sink.lock() {
+                    *lock = Some(p.display().to_string());
+                }
+            };
+            crate::fs_scan::scan_path_with_progress(std::path::Path::new(&run_path), &mut cb)
+                .map(AppState::new)
+                .map_err(|e| e.to_string())
+        },
+        move |result| Message::ScanCompleted {
+            request_id,
+            result,
+            root_input: done_path.clone(),
+        },
+    )
 }

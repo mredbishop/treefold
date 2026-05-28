@@ -32,6 +32,8 @@ None
 - [x] S24 GUI context menu: open location actions
 - [x] S25 GUI context menu: delete with confirmation
 - [x] S26 GUI start location and path selection UX
+- [x] S27 GUI scan-in-progress loader and interaction policy
+- [x] S28 GUI live scan progress output (current subfolder)
 
 ## Notes
 
@@ -52,3 +54,4 @@ None
 - Added folder/file-specific treemap styling, hover detail display, and right-click context menu actions.
 - Added OS file-browser integration for open/view-in-parent and delete-with-confirmation workflow with refresh.
 - GUI now starts at user home by default and supports both manual path entry and folder-picker selection.
+- GUI scan state now reports active progress, including the currently scanned subfolder during long scans.
