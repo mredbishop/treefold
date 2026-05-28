@@ -7,6 +7,7 @@ use ratatui::layout::Rect;
 use tempfile::tempdir;
 use treefold::fs_scan::{EntryKind, FsEntry, count_errors, scan_path};
 use treefold::gui::init_state_from_path;
+use treefold::gui_heatmap::{build_heatmap_blocks, color_for_ratio, hit_test};
 use treefold::input::{Action, map_key};
 use treefold::layout::{ensure_visible_offset, human_size, split_main};
 use treefold::state::AppState;
@@ -446,4 +447,88 @@ fn gui_app_initializes_from_path() {
     let root = std::env::current_dir().expect("cwd");
     let state = init_state_from_path(root.to_string_lossy().as_ref()).expect("init");
     assert!(state.root.path.exists());
+}
+
+#[test]
+fn gui_heatmap_blocks_within_bounds_and_non_overlapping() {
+    let entries = vec![
+        FsEntry {
+            path: "a".into(),
+            name: "a".into(),
+            kind: EntryKind::Directory,
+            size: 50,
+            children: vec![],
+            errors: vec![],
+        },
+        FsEntry {
+            path: "b".into(),
+            name: "b".into(),
+            kind: EntryKind::File,
+            size: 30,
+            children: vec![],
+            errors: vec![],
+        },
+        FsEntry {
+            path: "c".into(),
+            name: "c".into(),
+            kind: EntryKind::File,
+            size: 20,
+            children: vec![],
+            errors: vec![],
+        },
+    ];
+    let blocks = build_heatmap_blocks(800.0, 500.0, &entries);
+    assert!(!blocks.is_empty());
+    for b in &blocks {
+        assert!(b.rect.x >= 0.0 && b.rect.y >= 0.0);
+        assert!(b.rect.x + b.rect.width <= 800.0);
+        assert!(b.rect.y + b.rect.height <= 500.0);
+    }
+    for i in 0..blocks.len() {
+        for j in i + 1..blocks.len() {
+            let a = &blocks[i].rect;
+            let b = &blocks[j].rect;
+            let overlap = a.x < b.x + b.width
+                && a.x + a.width > b.x
+                && a.y < b.y + b.height
+                && a.y + a.height > b.y;
+            assert!(!overlap);
+        }
+    }
+}
+
+#[test]
+fn gui_heatmap_color_scale_ordering() {
+    let low = color_for_ratio(0.0);
+    let mid = color_for_ratio(0.5);
+    let high = color_for_ratio(1.0);
+    assert!(high.r > mid.r && mid.r > low.r);
+    assert!(low.b > mid.b && mid.b > high.b);
+}
+
+#[test]
+fn gui_heatmap_hit_test_maps_to_entry() {
+    let entries = vec![
+        FsEntry {
+            path: "dir".into(),
+            name: "dir".into(),
+            kind: EntryKind::Directory,
+            size: 90,
+            children: vec![],
+            errors: vec![],
+        },
+        FsEntry {
+            path: "file".into(),
+            name: "file".into(),
+            kind: EntryKind::File,
+            size: 10,
+            children: vec![],
+            errors: vec![],
+        },
+    ];
+    let blocks = build_heatmap_blocks(600.0, 400.0, &entries);
+    assert!(!blocks.is_empty());
+    let p = iced::Point::new(blocks[0].rect.x + 2.0, blocks[0].rect.y + 2.0);
+    let hit = hit_test(&blocks, p);
+    assert!(hit.is_some());
 }

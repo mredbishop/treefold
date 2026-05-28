@@ -1,10 +1,10 @@
 use std::path::PathBuf;
 
-use iced::widget::{button, column, container, progress_bar, row, scrollable, text, text_input};
+use iced::widget::{button, column, container, row, scrollable, text, text_input};
 use iced::{Element, Length, Task};
 
-use crate::fs_scan::{FsEntry, scan_path};
-use crate::layout::human_size;
+use crate::fs_scan::scan_path;
+use crate::gui_heatmap::heatmap_canvas;
 use crate::state::AppState;
 
 #[derive(Debug, Clone)]
@@ -13,6 +13,7 @@ pub enum Message {
     ScanPressed,
     RefreshPressed,
     EnterChild(usize),
+    HeatmapSelect(usize),
     GoParent,
 }
 
@@ -65,6 +66,18 @@ pub fn update(app: &mut GuiApp, message: Message) -> Task<Message> {
                 state.enter_selected();
             }
         }
+        Message::HeatmapSelect(idx) => {
+            if let Some(state) = app.state.as_mut() {
+                state.selected_index = idx;
+                state.clamp_selection();
+                if state
+                    .selected_child()
+                    .is_some_and(|e| matches!(e.kind, crate::fs_scan::EntryKind::Directory))
+                {
+                    state.enter_selected();
+                }
+            }
+        }
         Message::GoParent => {
             if let Some(state) = app.state.as_mut() {
                 state.go_parent();
@@ -89,7 +102,6 @@ pub fn view(app: &GuiApp) -> Element<'_, Message> {
 
     let body: Element<'_, Message> = if let Some(state) = &app.state {
         let children = state.current_children();
-        let total = children.iter().map(|e| e.size).sum::<u64>().max(1);
         let mut list_col =
             column![text(format!("Current: {}", state.current_dir.display()))].spacing(6);
         for (idx, child) in children.iter().enumerate() {
@@ -101,7 +113,7 @@ pub fn view(app: &GuiApp) -> Element<'_, Message> {
                 button(text(format!(
                     "[{kind}] {}  {}",
                     child.name,
-                    human_size(child.size)
+                    crate::layout::human_size(child.size)
                 )))
                 .on_press(Message::EnterChild(idx))
                 .width(Length::Fill),
@@ -109,14 +121,31 @@ pub fn view(app: &GuiApp) -> Element<'_, Message> {
         }
         let left = scrollable(list_col).height(Length::Fill);
 
-        let mut viz_col = column![text("Usage Visualization")].spacing(8);
-        for child in children.iter().take(40) {
-            viz_col = viz_col.push(usage_row(child, total));
-        }
-        let right = scrollable(viz_col).height(Length::Fill);
+        let selected_info = state
+            .selected_child()
+            .map(|e| {
+                format!(
+                    "Selected: {} | {} | {}",
+                    e.name,
+                    crate::layout::human_size(e.size),
+                    e.path.display()
+                )
+            })
+            .unwrap_or_else(|| "Selected: none".to_string());
+        let right = column![
+            text("Heatmap (SequoiaView style)"),
+            container(heatmap_canvas(children.to_vec(), Message::HeatmapSelect))
+                .width(Length::Fill)
+                .height(Length::Fill),
+            text(selected_info)
+        ]
+        .height(Length::Fill)
+        .spacing(8);
         row![
             container(left).width(Length::FillPortion(1)),
-            container(right).width(Length::FillPortion(2)),
+            container(right)
+                .width(Length::FillPortion(2))
+                .height(Length::Fill),
         ]
         .spacing(10)
         .into()
@@ -129,16 +158,6 @@ pub fn view(app: &GuiApp) -> Element<'_, Message> {
         root = root.push(text(format!("Error: {err}")));
     }
     root.into()
-}
-
-fn usage_row(entry: &FsEntry, total: u64) -> Element<'_, Message> {
-    let ratio = (entry.size as f32 / total as f32).clamp(0.0, 1.0);
-    row![
-        text(format!("{} ({})", entry.name, human_size(entry.size))).width(Length::FillPortion(2)),
-        container(progress_bar(0.0..=1.0, ratio)).width(Length::FillPortion(3)),
-    ]
-    .spacing(8)
-    .into()
 }
 
 pub fn run() -> iced::Result {

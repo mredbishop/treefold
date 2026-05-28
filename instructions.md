@@ -23,6 +23,7 @@ After completing each story:
 3. Commit the completed work if git is available.
 4. Select the next incomplete story.
 5. Continue until every story is complete.
+6. When all stories are complete, provide a final handoff that tells the user exactly how to build and run the app.
 
 If restarted, read `PROGRESS.md` first and resume from the next incomplete story.
 
@@ -102,6 +103,8 @@ None
 - [ ] S15 Apple Silicon binary packaging
 - [ ] S16 Iced GUI application foundation
 - [ ] S17 Cross-platform GUI packaging and release
+- [ ] S18 GUI box heatmap treemap renderer
+- [ ] S19 GUI heatmap interaction and polish
 
 ## Notes
 
@@ -723,6 +726,82 @@ As a user, I want installable/runnable GUI artifacts for Apple Silicon macOS and
 
 ---
 
+## S18 GUI box heatmap treemap renderer
+
+### User Story
+
+As a GUI user, I want the directory visualization to use a SequoiaView-style box heatmap treemap so large and small items are visually comparable by both area and color.
+
+### Acceptance Criteria
+
+* Replace the current GUI usage bars with a 2D box treemap panel.
+* Each visible item is rendered as a rectangle:
+
+  * area proportional to file/folder size
+  * fill color based on a heat scale (for example cool-to-warm by relative size)
+* Heatmap is deterministic for the same input.
+* Labels are shown when space allows and hidden/truncated safely when not.
+* Rendering handles:
+
+  * empty folders
+  * very small windows
+  * many entries
+* No overlaps or out-of-bounds rectangles in the rendered panel.
+
+### Tests
+
+* Unit tests for GUI treemap layout output:
+
+  * rectangles remain within bounds
+  * rectangles do not overlap
+  * larger entries get larger/equal area than smaller entries (where comparable)
+* Unit tests for heat color mapping:
+
+  * lowest, mid, and highest buckets map to expected color bands
+* GUI smoke test verifies heatmap view can render without panic.
+
+### Implementation Notes
+
+* Reuse existing treemap layout logic where possible; add GUI-specific rendering adapter.
+* Keep color scale logic in a pure helper for deterministic tests.
+
+---
+
+## S19 GUI heatmap interaction and polish
+
+### User Story
+
+As a GUI user, I want to interact with heatmap boxes directly so navigation feels natural and informative.
+
+### Acceptance Criteria
+
+* Clicking a directory box navigates into that directory.
+* Hovering or selecting a box reveals key metadata:
+
+  * name
+  * size
+  * path (full or truncated with tooltip/detail panel)
+* Selected box is visually distinct from unselected boxes.
+* If an item is aggregated (small-entry bucket), interaction remains stable and non-crashing.
+* Keyboard navigation remains available as fallback where implemented.
+
+### Tests
+
+* Interaction tests (or logic-level unit tests) for:
+
+  * hit-testing box -> corresponding entry
+  * click on directory updates current path
+  * click on file does not break navigation state
+* Regression test for resize + interaction sequence (no panic / stale selection).
+* Manual verification checklist confirms expected UX on macOS/Linux/Windows.
+
+### Implementation Notes
+
+* Separate hit-testing from drawing so it can be unit-tested.
+* Keep interaction model compatible with future zoom/animation enhancements.
+
+---
+
 # Continuous Iteration Protocol
 
 Use this loop until complete:
@@ -775,6 +854,12 @@ The product is complete only when:
 * Treemap updates when navigating.
 * Application exits cleanly.
 * `README.md` accurately reflects behaviour.
+* Final response includes explicit user-facing commands to:
+
+  * build the app
+  * run the TUI app
+  * run the GUI app (if present)
+  * run Apple Silicon packaging scripts (if present)
 
 ---
 
@@ -796,3 +881,20 @@ cargo run -- .
 ```
 
 Verify the UI interactively.
+
+Then provide a final user handoff section with exact commands, for example:
+
+```bash
+# Build
+cargo build
+
+# Run TUI
+cargo run -- .
+
+# Run GUI
+cargo run --bin treefold-gui
+
+# Apple Silicon packaging
+scripts/build_apple_silicon_app.sh
+scripts/build_gui_apple_silicon_app.sh
+```

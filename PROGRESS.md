@@ -23,6 +23,8 @@ None
 - [x] S15 Apple Silicon binary packaging
 - [x] S16 Iced GUI application foundation
 - [x] S17 Cross-platform GUI packaging and release
+- [x] S18 GUI box heatmap treemap renderer
+- [x] S19 GUI heatmap interaction and polish
 
 ## Notes
 
@@ -36,3 +38,5 @@ None
 - Added Apple Silicon packaging script that builds arm64 binary and creates a `.app` bundle.
 - Added `iced` GUI binary (`treefold-gui`) with path scan, entry navigation, refresh, and size-based visualization bars.
 - Added GUI packaging/check scripts for Apple Silicon app bundle and optional Linux/Windows target checks.
+- Replaced GUI usage bars with a SequoiaView-style heatmap canvas backed by treemap layout + heat color scaling.
+- Added heatmap hit-testing and click interaction to navigate into directories from boxes.

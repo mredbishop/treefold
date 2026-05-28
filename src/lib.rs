@@ -1,6 +1,7 @@
 pub mod app;
 pub mod fs_scan;
 pub mod gui;
+pub mod gui_heatmap;
 pub mod input;
 pub mod layout;
 pub mod state;
