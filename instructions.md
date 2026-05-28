@@ -105,6 +105,7 @@ None
 - [ ] S17 Cross-platform GUI packaging and release
 - [ ] S18 GUI box heatmap treemap renderer
 - [ ] S19 GUI heatmap interaction and polish
+- [ ] S20 GUI keyboard parity and visual focus
 
 ## Notes
 
@@ -799,6 +800,47 @@ As a GUI user, I want to interact with heatmap boxes directly so navigation feel
 
 * Separate hit-testing from drawing so it can be unit-tested.
 * Keep interaction model compatible with future zoom/animation enhancements.
+
+---
+
+## S20 GUI keyboard parity and visual focus
+
+### User Story
+
+As a GUI user, I want the same navigation keys as the TUI (arrow keys, `Enter`, `Esc`; excluding `q`) so keyboard navigation is consistent across interfaces.
+
+### Acceptance Criteria
+
+* GUI supports keyboard commands equivalent to TUI (excluding `q` quit):
+
+  * `Up` and `Down`: move selection/focus through current directory entries
+  * `Left` and `Esc`: go to parent directory
+  * `Right` and `Enter`: enter selected directory (file selection is non-crashing/no-op)
+* Focus/selection movement is visually obvious in GUI:
+
+  * list focus highlight updates on keypress
+  * heatmap selected box updates to match focused item when visible
+* Keyboard navigation and mouse interaction remain synchronized:
+
+  * clicking updates keyboard focus target
+  * keyboard updates selected heatmap/list state
+* `q` does not trigger quit behavior in GUI.
+
+### Tests
+
+* Unit tests for GUI key-to-action mapping parity (arrow keys, `Enter`, `Esc`).
+* State transition tests for:
+
+  * up/down selection movement bounds
+  * enter-directory and go-parent behavior
+  * enter on file is safe no-op
+* GUI smoke test verifies focus highlight updates after simulated key events.
+* Regression test confirms `q` key does not close or crash GUI.
+
+### Implementation Notes
+
+* Reuse existing navigation/state methods from shared app state where possible.
+* Keep key mapping in a small pure helper for deterministic tests.
 
 ---
 

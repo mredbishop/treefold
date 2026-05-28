@@ -74,16 +74,22 @@ pub fn hit_test(blocks: &[HeatmapBlock], point: Point) -> Option<usize> {
 
 pub fn heatmap_canvas<'a, Message: Clone + 'a>(
     entries: Vec<FsEntry>,
+    selected_index: Option<usize>,
     on_select: fn(usize) -> Message,
 ) -> Element<'a, Message> {
-    Canvas::new(HeatmapCanvas { entries, on_select })
-        .width(Length::Fill)
-        .height(Length::Fill)
-        .into()
+    Canvas::new(HeatmapCanvas {
+        entries,
+        selected_index,
+        on_select,
+    })
+    .width(Length::Fill)
+    .height(Length::Fill)
+    .into()
 }
 
 struct HeatmapCanvas<Message> {
     entries: Vec<FsEntry>,
+    selected_index: Option<usize>,
     on_select: fn(usize) -> Message,
 }
 
@@ -132,6 +138,12 @@ impl<Message: Clone> Program<Message> for HeatmapCanvas<Message> {
                 &rect,
                 Stroke::default().with_color(Color::from_rgba(0.0, 0.0, 0.0, 0.45)),
             );
+            if self.selected_index.is_some_and(|i| i == block.index) {
+                frame.stroke(
+                    &rect,
+                    Stroke::default().with_width(3.0).with_color(Color::WHITE),
+                );
+            }
 
             if block.rect.width >= 80.0 && block.rect.height >= 22.0 {
                 frame.fill_text(Text {

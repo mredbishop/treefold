@@ -7,6 +7,7 @@ use ratatui::layout::Rect;
 use tempfile::tempdir;
 use treefold::fs_scan::{EntryKind, FsEntry, count_errors, scan_path};
 use treefold::gui::init_state_from_path;
+use treefold::gui::{GuiKeyAction, map_key_event};
 use treefold::gui_heatmap::{build_heatmap_blocks, color_for_ratio, hit_test};
 use treefold::input::{Action, map_key};
 use treefold::layout::{ensure_visible_offset, human_size, split_main};
@@ -531,4 +532,69 @@ fn gui_heatmap_hit_test_maps_to_entry() {
     let p = iced::Point::new(blocks[0].rect.x + 2.0, blocks[0].rect.y + 2.0);
     let hit = hit_test(&blocks, p);
     assert!(hit.is_some());
+}
+
+#[test]
+fn gui_key_mapping_parity() {
+    let up = iced::Event::Keyboard(iced::keyboard::Event::KeyPressed {
+        key: iced::keyboard::Key::Named(iced::keyboard::key::Named::ArrowUp),
+        location: iced::keyboard::Location::Standard,
+        modifiers: iced::keyboard::Modifiers::default(),
+        text: None,
+        modified_key: iced::keyboard::Key::Named(iced::keyboard::key::Named::ArrowUp),
+        physical_key: iced::keyboard::key::Physical::Unidentified(
+            iced::keyboard::key::NativeCode::Unidentified,
+        ),
+        repeat: false,
+    });
+    let down = iced::Event::Keyboard(iced::keyboard::Event::KeyPressed {
+        key: iced::keyboard::Key::Named(iced::keyboard::key::Named::ArrowDown),
+        location: iced::keyboard::Location::Standard,
+        modifiers: iced::keyboard::Modifiers::default(),
+        text: None,
+        modified_key: iced::keyboard::Key::Named(iced::keyboard::key::Named::ArrowDown),
+        physical_key: iced::keyboard::key::Physical::Unidentified(
+            iced::keyboard::key::NativeCode::Unidentified,
+        ),
+        repeat: false,
+    });
+    let enter = iced::Event::Keyboard(iced::keyboard::Event::KeyPressed {
+        key: iced::keyboard::Key::Named(iced::keyboard::key::Named::Enter),
+        location: iced::keyboard::Location::Standard,
+        modifiers: iced::keyboard::Modifiers::default(),
+        text: None,
+        modified_key: iced::keyboard::Key::Named(iced::keyboard::key::Named::Enter),
+        physical_key: iced::keyboard::key::Physical::Unidentified(
+            iced::keyboard::key::NativeCode::Unidentified,
+        ),
+        repeat: false,
+    });
+    let esc = iced::Event::Keyboard(iced::keyboard::Event::KeyPressed {
+        key: iced::keyboard::Key::Named(iced::keyboard::key::Named::Escape),
+        location: iced::keyboard::Location::Standard,
+        modifiers: iced::keyboard::Modifiers::default(),
+        text: None,
+        modified_key: iced::keyboard::Key::Named(iced::keyboard::key::Named::Escape),
+        physical_key: iced::keyboard::key::Physical::Unidentified(
+            iced::keyboard::key::NativeCode::Unidentified,
+        ),
+        repeat: false,
+    });
+    let q = iced::Event::Keyboard(iced::keyboard::Event::KeyPressed {
+        key: iced::keyboard::Key::Character("q".into()),
+        location: iced::keyboard::Location::Standard,
+        modifiers: iced::keyboard::Modifiers::default(),
+        text: Some("q".into()),
+        modified_key: iced::keyboard::Key::Character("q".into()),
+        physical_key: iced::keyboard::key::Physical::Unidentified(
+            iced::keyboard::key::NativeCode::Unidentified,
+        ),
+        repeat: false,
+    });
+
+    assert_eq!(map_key_event(&up), GuiKeyAction::Up);
+    assert_eq!(map_key_event(&down), GuiKeyAction::Down);
+    assert_eq!(map_key_event(&enter), GuiKeyAction::Enter);
+    assert_eq!(map_key_event(&esc), GuiKeyAction::Back);
+    assert_eq!(map_key_event(&q), GuiKeyAction::None);
 }
