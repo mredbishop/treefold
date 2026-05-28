@@ -1,10 +1,10 @@
 use ratatui::prelude::*;
-use ratatui::widgets::{Block, Borders, Clear, List, ListItem, Paragraph};
+use ratatui::widgets::{Block, Borders, Clear, List, ListItem, Paragraph, Wrap};
 
 use crate::fs_scan::EntryKind;
 use crate::layout::{human_size, split_main};
 use crate::state::AppState;
-use crate::treemap::build_treemap;
+use crate::treemap::{TreemapBlock, build_treemap};
 
 pub fn render(frame: &mut Frame<'_>, state: &AppState, status: &str) {
     let outer = Layout::vertical([Constraint::Min(0), Constraint::Length(1)]).split(frame.area());
@@ -57,8 +57,8 @@ fn render_treemap(frame: &mut Frame<'_>, state: &AppState, area: Rect) {
     }
 
     let blocks = build_treemap(inner, children);
-    if blocks.is_empty() {
-        frame.render_widget(Paragraph::new("No non-zero entries"), inner);
+    if let Some(msg) = treemap_fallback_message(inner, children, &blocks) {
+        frame.render_widget(Paragraph::new(msg).wrap(Wrap { trim: true }), inner);
         return;
     }
     let selected = state.selected_child().map(|e| e.path.clone());
@@ -81,6 +81,20 @@ fn render_treemap(frame: &mut Frame<'_>, state: &AppState, area: Rect) {
         frame.render_widget(Clear, b.rect);
         frame.render_widget(w, b.rect);
     }
+}
+
+pub fn treemap_fallback_message(
+    area: Rect,
+    children: &[crate::fs_scan::FsEntry],
+    blocks: &[TreemapBlock],
+) -> Option<&'static str> {
+    if area.width < 8 || area.height < 4 {
+        return Some("Treemap too small for current terminal size");
+    }
+    if children.iter().all(|e| e.size == 0) || blocks.is_empty() {
+        return Some("No non-zero entries");
+    }
+    None
 }
 
 fn truncate_label(input: &str, width: usize) -> String {

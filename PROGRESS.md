@@ -13,12 +13,14 @@ None
 - [x] S5 Directory list panel
 - [x] S6 Treemap layout algorithm
 - [x] S7 Treemap rendering
-- [x] S8 Cross-platform terminal lifecycle
-- [x] S9 Error handling and permissions
-- [x] S10 Polish, docs, and release checks
+- [x] S8 Treemap fit-to-panel behaviour
+- [x] S9 Cross-platform terminal lifecycle
+- [x] S10 Error handling and permissions
+- [x] S11 Polish, docs, and release checks
 
 ## Notes
 
 - Implemented scanner with per-entry error capture and non-fatal traversal.
 - Implemented list + treemap split layout (33/67) with status bar.
 - Terminal lifecycle is managed via `TerminalGuard` and cleaned up on drop.
+- Treemap blocks are clipped to panel bounds, tiny panel fallback message added, and fit/overlap/utilization tests added.

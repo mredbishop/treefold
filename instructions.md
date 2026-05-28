@@ -92,9 +92,10 @@ None
 - [ ] S5 Directory list panel
 - [ ] S6 Treemap layout algorithm
 - [ ] S7 Treemap rendering
-- [ ] S8 Cross-platform terminal lifecycle
-- [ ] S9 Error handling and permissions
-- [ ] S10 Polish, docs, and release checks
+- [ ] S8 Treemap fit-to-panel behaviour
+- [ ] S9 Cross-platform terminal lifecycle
+- [ ] S10 Error handling and permissions
+- [ ] S11 Polish, docs, and release checks
 
 ## Notes
 
@@ -395,7 +396,44 @@ As a user, I want the right two thirds of the screen to show a treemap of the cu
 
 ---
 
-## S8 Cross-platform terminal lifecycle
+## S8 Treemap fit-to-panel behaviour
+
+### User Story
+
+As a user, I want the treemap to use all available space in the right panel without overflowing, so the visualization remains readable at any terminal size.
+
+### Acceptance Criteria
+
+* Treemap rendering uses the exact inner rectangle of the right panel (after borders/padding).
+* All treemap blocks are clipped to panel bounds.
+* Treemap area utilization is maximized for visible non-zero entries:
+
+  * no unintended blank rows/columns caused by rounding drift
+  * no overlaps
+* For tiny terminal sizes, rendering degrades gracefully:
+
+  * still no panic
+  * shows a clear fallback when blocks cannot be meaningfully drawn
+* On terminal resize, treemap recomputes layout from the new panel size on the next draw.
+
+### Tests
+
+* Unit tests for fit logic:
+
+  * all block rects are within the treemap panel inner rect
+  * blocks do not overlap
+  * sum of block area is bounded by panel area and close to it for normal sizes
+* Regression test with narrow/tiny rectangles (for example `width < 8` or `height < 4`) verifies graceful fallback output.
+* Resize-flow test (logic-level) verifies recomputation when dimensions change.
+
+### Implementation Notes
+
+* Keep using slice-and-dice if desired; add a deterministic remainder distribution strategy to reduce rounding gaps.
+* Separate layout computation from rendering so fit/clipping can be tested independently.
+
+---
+
+## S9 Cross-platform terminal lifecycle
 
 ### User Story
 
@@ -422,7 +460,7 @@ As a user, I want the app to reliably enter and leave terminal UI mode.
 
 ---
 
-## S9 Error handling and permissions
+## S10 Error handling and permissions
 
 ### User Story
 
@@ -448,7 +486,7 @@ As a user, I want scan errors to be visible but non-fatal.
 
 ---
 
-## S10 Polish, docs, and release checks
+## S11 Polish, docs, and release checks
 
 ### User Story
 

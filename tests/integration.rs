@@ -9,8 +9,8 @@ use treefold::fs_scan::{EntryKind, FsEntry, count_errors, scan_path};
 use treefold::input::{Action, map_key};
 use treefold::layout::{ensure_visible_offset, human_size, split_main};
 use treefold::state::AppState;
-use treefold::treemap::build_treemap;
-use treefold::ui::{render, status_line};
+use treefold::treemap::{build_treemap, rect_within_bounds, rects_overlap};
+use treefold::ui::{render, status_line, treemap_fallback_message};
 
 fn key(code: KeyCode, modifiers: KeyModifiers) -> KeyEvent {
     KeyEvent::new(code, modifiers)
@@ -212,6 +212,106 @@ fn treemap_algorithm_properties() {
     let area_big = rects2[0].rect.width as u32 * rects2[0].rect.height as u32;
     let area_small = rects2[1].rect.width as u32 * rects2[1].rect.height as u32;
     assert!(area_big > area_small);
+}
+
+#[test]
+fn treemap_fit_bounds_overlap_and_utilization() {
+    let area = Rect::new(3, 2, 60, 20);
+    let entries = vec![
+        FsEntry {
+            path: "a".into(),
+            name: "a".into(),
+            kind: EntryKind::File,
+            size: 50,
+            children: vec![],
+            errors: vec![],
+        },
+        FsEntry {
+            path: "b".into(),
+            name: "b".into(),
+            kind: EntryKind::File,
+            size: 30,
+            children: vec![],
+            errors: vec![],
+        },
+        FsEntry {
+            path: "c".into(),
+            name: "c".into(),
+            kind: EntryKind::File,
+            size: 20,
+            children: vec![],
+            errors: vec![],
+        },
+    ];
+    let blocks = build_treemap(area, &entries);
+    assert!(!blocks.is_empty());
+
+    for b in &blocks {
+        assert!(rect_within_bounds(b.rect, area));
+    }
+
+    for (i, a) in blocks.iter().enumerate() {
+        for b in blocks.iter().skip(i + 1) {
+            assert!(!rects_overlap(a.rect, b.rect));
+        }
+    }
+
+    let sum_area: u32 = blocks
+        .iter()
+        .map(|b| b.rect.width as u32 * b.rect.height as u32)
+        .sum();
+    let panel_area = area.width as u32 * area.height as u32;
+    assert!(sum_area <= panel_area);
+    assert!(sum_area >= panel_area.saturating_sub(area.width as u32));
+}
+
+#[test]
+fn treemap_tiny_rect_has_fallback_message() {
+    let area = Rect::new(0, 0, 7, 3);
+    let entries = vec![FsEntry {
+        path: "a".into(),
+        name: "a".into(),
+        kind: EntryKind::File,
+        size: 10,
+        children: vec![],
+        errors: vec![],
+    }];
+    let blocks = build_treemap(area, &entries);
+    let message = treemap_fallback_message(area, &entries, &blocks);
+    assert_eq!(message, Some("Treemap too small for current terminal size"));
+}
+
+#[test]
+fn treemap_recomputes_on_resize() {
+    let entries = vec![
+        FsEntry {
+            path: "a".into(),
+            name: "a".into(),
+            kind: EntryKind::File,
+            size: 3,
+            children: vec![],
+            errors: vec![],
+        },
+        FsEntry {
+            path: "b".into(),
+            name: "b".into(),
+            kind: EntryKind::File,
+            size: 2,
+            children: vec![],
+            errors: vec![],
+        },
+    ];
+    let small = build_treemap(Rect::new(0, 0, 20, 8), &entries);
+    let large = build_treemap(Rect::new(0, 0, 80, 24), &entries);
+    let small_area: u32 = small
+        .iter()
+        .map(|b| b.rect.width as u32 * b.rect.height as u32)
+        .sum();
+    let large_area: u32 = large
+        .iter()
+        .map(|b| b.rect.width as u32 * b.rect.height as u32)
+        .sum();
+    assert!(large_area > small_area);
 }
 
 #[test]
