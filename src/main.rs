@@ -12,19 +12,28 @@ fn run_main() -> anyhow::Result<()> {
         return Ok(());
     }
 
-    let path = if let Some(path) = parsed.path {
-        if !path.exists() {
-            anyhow::bail!("invalid path: {}", path.display());
-        }
-        path
-    } else {
-        std::env::current_dir()?
-    };
-
     match parsed.mode {
-        treefold::cli::Mode::Tui => treefold::app::run_with_path(path),
+        treefold::cli::Mode::Tui => {
+            let path = if let Some(path) = parsed.path {
+                if !path.exists() {
+                    anyhow::bail!("invalid path: {}", path.display());
+                }
+                path
+            } else {
+                std::env::current_dir()?
+            };
+            treefold::app::run_with_path(path)
+        }
         treefold::cli::Mode::Gui => {
-            treefold::gui::run_with_path(Some(path)).map_err(anyhow::Error::msg)
+            let path = if let Some(path) = parsed.path {
+                if !path.exists() {
+                    anyhow::bail!("invalid path: {}", path.display());
+                }
+                Some(path)
+            } else {
+                None
+            };
+            treefold::gui::run_with_path(path).map_err(anyhow::Error::msg)
         }
     }
 }

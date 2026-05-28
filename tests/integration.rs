@@ -10,6 +10,7 @@ use treefold::fs_scan::{EntryKind, FsEntry, count_errors, scan_path};
 use treefold::gui::{GuiKeyAction, map_key_event};
 use treefold::gui::{
     context_delete_label, context_open_label, init_state_from_path, open_target_path,
+    resolve_default_root_path_from_env,
 };
 use treefold::gui_heatmap::{build_heatmap_blocks, color_for_ratio, hit_test, style_for_block};
 use treefold::input::{Action, map_key};
@@ -681,4 +682,38 @@ fn delete_path_confirm_and_cancel_behavior() {
     // confirm behavior: delete
     delete_path(&file, false).expect("delete file");
     assert!(!file.exists());
+}
+
+#[test]
+fn gui_default_root_prefers_home() {
+    let p = resolve_default_root_path_from_env(
+        Some(std::path::PathBuf::from("/tmp/home-test")),
+        Some(std::path::PathBuf::from("/tmp/userprofile-test")),
+        Some(std::path::PathBuf::from("/tmp/cwd-test")),
+    );
+    assert_eq!(p, std::path::PathBuf::from("/tmp/home-test"));
+}
+
+#[test]
+fn gui_default_root_falls_back_to_userprofile_then_cwd() {
+    let p1 = resolve_default_root_path_from_env(
+        None,
+        Some(std::path::PathBuf::from("/tmp/userprofile-test")),
+        Some(std::path::PathBuf::from("/tmp/cwd-test")),
+    );
+    assert_eq!(p1, std::path::PathBuf::from("/tmp/userprofile-test"));
+
+    let p2 = resolve_default_root_path_from_env(
+        None,
+        None,
+        Some(std::path::PathBuf::from("/tmp/cwd-test")),
+    );
+    assert_eq!(p2, std::path::PathBuf::from("/tmp/cwd-test"));
+}
+
+#[test]
+fn gui_manual_invalid_path_returns_error() {
+    let bad = "/definitely/not/a/real/treefold/path";
+    let result = init_state_from_path(bad);
+    assert!(result.is_err());
 }

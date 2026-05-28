@@ -3,9 +3,10 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TARGET="aarch64-apple-darwin"
-APP_NAME="treefold"
+BIN_NAME="treefold"
+APP_NAME="treefold-tui"
 APP_DIR="${ROOT_DIR}/dist/${APP_NAME}.app"
-BIN_PATH="${ROOT_DIR}/target/${TARGET}/release/${APP_NAME}"
+BIN_PATH="${ROOT_DIR}/target/${TARGET}/release/${BIN_NAME}"
 RES_DIR="${APP_DIR}/Contents/Resources"
 MACOS_DIR="${APP_DIR}/Contents/MacOS"
 
@@ -13,7 +14,7 @@ cd "${ROOT_DIR}"
 cargo build --release --target "${TARGET}"
 
 mkdir -p "${RES_DIR}" "${MACOS_DIR}"
-cp "${BIN_PATH}" "${MACOS_DIR}/${APP_NAME}"
+cp "${BIN_PATH}" "${MACOS_DIR}/${BIN_NAME}"
 
 if [[ -f "${ROOT_DIR}/assets/treefold.icns" ]]; then
   cp "${ROOT_DIR}/assets/treefold.icns" "${RES_DIR}/treefold.icns"
@@ -25,11 +26,11 @@ cat > "${APP_DIR}/Contents/Info.plist" <<'PLIST'
 <plist version="1.0">
 <dict>
   <key>CFBundleName</key>
-  <string>treefold</string>
+  <string>treefold-tui</string>
   <key>CFBundleDisplayName</key>
-  <string>treefold</string>
+  <string>treefold-tui</string>
   <key>CFBundleIdentifier</key>
-  <string>com.treefold.app</string>
+  <string>com.treefold.tui</string>
   <key>CFBundleVersion</key>
   <string>1</string>
   <key>CFBundleShortVersionString</key>
@@ -46,6 +47,6 @@ cat > "${APP_DIR}/Contents/Info.plist" <<'PLIST'
 </plist>
 PLIST
 
-chmod +x "${MACOS_DIR}/${APP_NAME}"
+chmod +x "${MACOS_DIR}/${BIN_NAME}"
 echo "Built ${APP_DIR}"
 echo "Binary: ${BIN_PATH}"

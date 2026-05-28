@@ -15,6 +15,7 @@ pub enum Message {
     RootChanged(String),
     ScanPressed,
     RefreshPressed,
+    BrowsePressed,
     EnterChild(usize),
     HeatmapSelect(usize),
     HeatmapEvent(HeatmapEvent),
@@ -39,8 +40,8 @@ pub struct GuiApp {
 
 impl Default for GuiApp {
     fn default() -> Self {
-        let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
-        Self::with_root_input(cwd.display().to_string())
+        let root = resolve_default_root_path();
+        Self::with_root_input(root.display().to_string())
     }
 }
 
@@ -60,8 +61,14 @@ impl GuiApp {
     }
 
     fn scan_current_root(&mut self) {
-        match init_state_from_path(self.root_input.trim()) {
+        let root_input = self.root_input.trim().to_string();
+        self.apply_path(root_input);
+    }
+
+    fn apply_path(&mut self, root_input: String) {
+        match init_state_from_path(root_input.trim()) {
             Ok(root) => {
+                self.root_input = root_input;
                 self.state = Some(root);
                 self.error = None;
                 self.selected_heatmap_index = Some(0);
@@ -76,6 +83,24 @@ impl GuiApp {
     }
 }
 
+pub fn resolve_default_root_path() -> PathBuf {
+    resolve_default_root_path_from_env(
+        std::env::var_os("HOME").map(PathBuf::from),
+        std::env::var_os("USERPROFILE").map(PathBuf::from),
+        std::env::current_dir().ok(),
+    )
+}
+
+pub fn resolve_default_root_path_from_env(
+    home: Option<PathBuf>,
+    userprofile: Option<PathBuf>,
+    cwd: Option<PathBuf>,
+) -> PathBuf {
+    home.or(userprofile)
+        .or(cwd)
+        .unwrap_or_else(|| PathBuf::from("."))
+}
+
 pub fn init_state_from_path(path: &str) -> Result<AppState, String> {
     let root = scan_path(&PathBuf::from(path)).map_err(|e| e.to_string())?;
     Ok(AppState::new(root))
@@ -85,6 +110,11 @@ pub fn update(app: &mut GuiApp, message: Message) -> Task<Message> {
     match message {
         Message::RootChanged(value) => app.root_input = value,
         Message::ScanPressed | Message::RefreshPressed => app.scan_current_root(),
+        Message::BrowsePressed => {
+            if let Some(path) = rfd::FileDialog::new().pick_folder() {
+                app.apply_path(path.display().to_string());
+            }
+        }
         Message::EnterChild(idx) => {
             if let Some(state) = app.state.as_mut() {
                 state.selected_index = idx;
@@ -168,6 +198,7 @@ pub fn view(app: &GuiApp) -> Element<'_, Message> {
             .padding(8)
             .width(Length::Fill),
         button("Scan").on_press(Message::ScanPressed),
+        button("Browse").on_press(Message::BrowsePressed),
         button("Refresh").on_press(Message::RefreshPressed),
         button("Up").on_press(Message::GoParent),
     ]

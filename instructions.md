@@ -111,6 +111,7 @@ None
 - [ ] S23 GUI treemap hover details
 - [ ] S24 GUI context menu: open location actions
 - [ ] S25 GUI context menu: delete with confirmation
+- [ ] S26 GUI start location and path selection UX
 
 ## Notes
 
@@ -1007,6 +1008,39 @@ As a GUI user, I want a right-click delete action with confirmation so I can saf
 
 * Wrap filesystem mutation in a small service layer to simplify mocking/testing.
 * Consider optional future enhancement for trash/recycle-bin behavior.
+
+---
+
+## S26 GUI start location and path selection UX
+
+### User Story
+
+As a GUI user, I want the app to open in my home directory by default, while still allowing me to navigate above it or choose another path via picker or manual entry.
+
+### Acceptance Criteria
+
+* GUI default start path is the current user home directory (not project cwd).
+* User can navigate upward beyond home directory using existing navigation controls.
+* GUI provides folder picker action to choose a new root/current path.
+* GUI still supports manual path entry and scan from typed path.
+* Invalid typed or picked paths show a clear non-fatal error message.
+* After selecting or typing a path, directory list + heatmap refresh to that location.
+
+### Tests
+
+* Unit test for default GUI start-path resolver returns home directory when available.
+* State/navigation tests confirm parent traversal works above home.
+* Unit/integration tests for manual path submission:
+
+  * valid path loads
+  * invalid path surfaces error and preserves stable state
+* Folder picker flow test (logic-level or mocked callback) verifies selected path is applied.
+
+### Implementation Notes
+
+* Keep path-resolution and validation in a testable helper.
+* Abstract folder-picker integration behind a small adapter to keep platform differences isolated.
+* Preserve CLI path override behavior: explicit path argument should still take precedence over GUI default home path.
 
 ---
 

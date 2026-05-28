@@ -14,13 +14,18 @@ cargo build
 cargo run -- <optional-path>
 ```
 
-Default mode is GUI. If no path is supplied, `treefold` scans the current working directory.
+Default mode is GUI. If no path is supplied, GUI opens at the user home directory.
 
 Run in TUI mode:
 
 ```bash
 cargo run -- --tui <optional-path>
 ```
+
+In GUI mode you can change location by:
+
+- Typing a path and pressing `Enter` or `Scan`
+- Clicking `Browse` to choose a folder
 
 ## Controls
 
@@ -70,7 +75,7 @@ scripts/build_apple_silicon_app.sh
 Artifacts:
 
 - Binary: `target/aarch64-apple-darwin/release/treefold`
-- App bundle: `dist/treefold.app`
+- App bundle: `dist/treefold-tui.app`
 
 Check architecture:
 
@@ -98,6 +103,10 @@ Build Apple Silicon macOS GUI app bundle:
 chmod +x scripts/build_gui_apple_silicon_app.sh
 scripts/build_gui_apple_silicon_app.sh
 ```
+
+GUI artifact:
+
+- App bundle: `dist/treefold.app`
 
 Cross-platform GUI target checks (when targets are installed):
 

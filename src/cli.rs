@@ -52,5 +52,5 @@ Options:
   -h, --help   Show this help
 
 Args:
-  PATH         Optional starting path (defaults to current working directory)"
+  PATH         Optional starting path (GUI default: home, TUI default: current working directory)"
 }

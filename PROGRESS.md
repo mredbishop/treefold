@@ -31,6 +31,7 @@ None
 - [x] S23 GUI treemap hover details
 - [x] S24 GUI context menu: open location actions
 - [x] S25 GUI context menu: delete with confirmation
+- [x] S26 GUI start location and path selection UX
 
 ## Notes
 
@@ -50,3 +51,4 @@ None
 - Added CLI mode parser with GUI default, plus `-t`/`--tui` to force terminal mode while preserving optional path handling.
 - Added folder/file-specific treemap styling, hover detail display, and right-click context menu actions.
 - Added OS file-browser integration for open/view-in-parent and delete-with-confirmation workflow with refresh.
+- GUI now starts at user home by default and supports both manual path entry and folder-picker selection.
