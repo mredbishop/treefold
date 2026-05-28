@@ -16,6 +16,7 @@ pub enum Message {
     ScanPressed,
     RefreshPressed,
     BrowsePressed,
+    ScanCompleted(Result<AppState, String>, String),
     EnterChild(usize),
     HeatmapSelect(usize),
     HeatmapEvent(HeatmapEvent),
@@ -47,7 +48,7 @@ impl Default for GuiApp {
 
 impl GuiApp {
     fn with_root_input(root_input: String) -> Self {
-        let mut app = Self {
+        Self {
             root_input,
             state: None,
             error: None,
@@ -55,18 +56,11 @@ impl GuiApp {
             hovered_heatmap_index: None,
             context_target: None,
             confirm_delete: false,
-        };
-        app.scan_current_root();
-        app
+        }
     }
 
-    fn scan_current_root(&mut self) {
-        let root_input = self.root_input.trim().to_string();
-        self.apply_path(root_input);
-    }
-
-    fn apply_path(&mut self, root_input: String) {
-        match init_state_from_path(root_input.trim()) {
+    fn apply_loaded_state(&mut self, root_input: String, result: Result<AppState, String>) {
+        match result {
             Ok(root) => {
                 self.root_input = root_input;
                 self.state = Some(root);
@@ -109,12 +103,27 @@ pub fn init_state_from_path(path: &str) -> Result<AppState, String> {
 pub fn update(app: &mut GuiApp, message: Message) -> Task<Message> {
     match message {
         Message::RootChanged(value) => app.root_input = value,
-        Message::ScanPressed | Message::RefreshPressed => app.scan_current_root(),
+        Message::ScanPressed | Message::RefreshPressed => {
+            let path = app.root_input.trim().to_string();
+            let run_path = path.clone();
+            let done_path = path;
+            return Task::perform(
+                async move { init_state_from_path(&run_path) },
+                move |result| Message::ScanCompleted(result, done_path.clone()),
+            );
+        }
         Message::BrowsePressed => {
             if let Some(path) = rfd::FileDialog::new().pick_folder() {
-                app.apply_path(path.display().to_string());
+                let path_str = path.display().to_string();
+                let run_path = path_str.clone();
+                let done_path = path_str;
+                return Task::perform(
+                    async move { init_state_from_path(&run_path) },
+                    move |result| Message::ScanCompleted(result, done_path.clone()),
+                );
             }
         }
+        Message::ScanCompleted(result, root_input) => app.apply_loaded_state(root_input, result),
         Message::EnterChild(idx) => {
             if let Some(state) = app.state.as_mut() {
                 state.selected_index = idx;
@@ -174,7 +183,13 @@ pub fn update(app: &mut GuiApp, message: Message) -> Task<Message> {
                 {
                     app.error = Some(err);
                 } else {
-                    app.scan_current_root();
+                    let path = app.root_input.trim().to_string();
+                    let run_path = path.clone();
+                    let done_path = path;
+                    return Task::perform(
+                        async move { init_state_from_path(&run_path) },
+                        move |result| Message::ScanCompleted(result, done_path.clone()),
+                    );
                 }
             }
             app.context_target = None;
@@ -331,13 +346,22 @@ pub fn run() -> iced::Result {
 }
 
 pub fn run_with_path(path: Option<PathBuf>) -> iced::Result {
+    let initial_root = path
+        .map(|p| p.display().to_string())
+        .unwrap_or_else(|| resolve_default_root_path().display().to_string());
+
     iced::application(
         move || {
-            if let Some(path) = path.clone() {
-                GuiApp::with_root_input(path.display().to_string())
-            } else {
-                GuiApp::default()
-            }
+            let app = GuiApp::with_root_input(initial_root.clone());
+            let scan_path = initial_root.clone();
+            let done_path = initial_root.clone();
+            (
+                app,
+                Task::perform(
+                    async move { init_state_from_path(&scan_path) },
+                    move |result| Message::ScanCompleted(result, done_path.clone()),
+                ),
+            )
         },
         update,
         view,
