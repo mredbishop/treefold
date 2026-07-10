@@ -114,6 +114,8 @@ None
 - [ ] S26 GUI start location and path selection UX
 - [ ] S27 GUI scan-in-progress loader and interaction policy
 - [ ] S28 GUI live scan progress output (current subfolder)
+- [ ] S29 GUI cancel in-progress scan
+- [ ] S30 GUI clear stale results on new scan start
 
 ## Notes
 
@@ -1110,6 +1112,65 @@ As a GUI user, I want to see live progress showing which subfolder is currently 
 * Introduce scanner progress callback/event channel (for example periodic message with current path).
 * Keep progress events lightweight and throttled if needed to avoid UI flooding.
 * Preserve non-fatal error behavior and request-token guard for async scans.
+
+---
+
+## S29 GUI cancel in-progress scan
+
+### User Story
+
+As a GUI user, I want to stop an active scan so I can quickly correct path mistakes or avoid waiting for a long scan I no longer need.
+
+### Acceptance Criteria
+
+* GUI provides a clear `Stop`/`Cancel scan` action while scanning is active.
+* Triggering cancel stops further progress updates from that scan and returns UI to idle scan state.
+* Canceled scan results are never applied to list/treemap (no stale completion overwrite).
+* Cancel is safe to invoke repeatedly and does not panic.
+* User can start a new scan immediately after cancel.
+
+### Tests
+
+* Unit tests for scan lifecycle transitions:
+
+  * scanning -> canceled -> idle
+  * canceled scan completion event is ignored
+* Regression test for rapid `scan -> cancel -> rescan` ensures only latest request updates UI.
+* GUI logic test verifies cancel control is visible only during active scan.
+
+### Implementation Notes
+
+* Use request-id/token invalidation so canceled tasks cannot mutate active state.
+* Prefer cooperative cancel behavior (ignore stale results/progress) unless hard cancellation is practical.
+* Ensure loader/progress text clears consistently on cancel.
+
+---
+
+## S30 GUI clear stale results on new scan start
+
+### User Story
+
+As a GUI user, I want list and treemap to clear when starting a new scan so I do not mistake old results for the new target path.
+
+### Acceptance Criteria
+
+* Starting a new scan clears current list and treemap immediately.
+* UI shows loading/progress state instead of previous folder contents during scan.
+* On scan success, fresh results replace cleared state.
+* On scan failure/cancel, stale prior results remain cleared and UI shows appropriate error/idle state.
+* Behavior is consistent for startup scan, manual path scan, refresh, and browse-selected path scan.
+
+### Tests
+
+* GUI state test verifies `state` is cleared at scan start before completion.
+* Regression test ensures previous folder entries are not visible during active scan.
+* Scan-failure test verifies stale content does not reappear after failed new scan.
+
+### Implementation Notes
+
+* Clear view-model data at scan initiation, not at completion.
+* Keep error rendering separate from content rendering to avoid fallback to previous state.
+* Pair with request-id guard to avoid out-of-order result rehydration.
 
 ---
 

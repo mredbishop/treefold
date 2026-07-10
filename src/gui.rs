@@ -319,29 +319,7 @@ pub fn view(app: &GuiApp) -> Element<'_, Message> {
         text("")
     };
 
-    let body: Element<'_, Message> = if app.is_scanning && app.state.is_none() {
-        let active = app
-            .scanning_current_subfolder
-            .as_deref()
-            .unwrap_or("Preparing scan...");
-        container(
-            column![
-                text("Scanning in progress").size(24),
-                text(format!(
-                    "Root: {}",
-                    app.scanning_path.as_deref().unwrap_or("<unknown>")
-                )),
-                text(format!("Current: {active}")),
-                text("Waiting for directory access prompts is normal on macOS.")
-            ]
-            .spacing(8),
-        )
-        .width(Length::Fill)
-        .height(Length::Fill)
-        .center_x(Length::Fill)
-        .center_y(Length::Fill)
-        .into()
-    } else if let Some(state) = &app.state {
+    let body: Element<'_, Message> = if let Some(state) = &app.state {
         let children = state.current_children();
         let mut list_col =
             column![text(format!("Current: {}", state.current_dir.display()))].spacing(6);
